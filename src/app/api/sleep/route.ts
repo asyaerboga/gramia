@@ -50,8 +50,13 @@ export async function GET(request: Request) {
       query.date = { $gte: d, $lt: nextDay };
     }
 
-    const sleepRecords = await Sleep.find(query).sort({ date: -1 }).limit(30);
+    // Single-date query → return one record (or null); multi-date → return array
+    if (date) {
+      const record = await Sleep.findOne(query);
+      return NextResponse.json(record);
+    }
 
+    const sleepRecords = await Sleep.find(query).sort({ date: -1 }).limit(30);
     return NextResponse.json(sleepRecords);
   } catch (error) {
     console.error("Sleep fetch error:", error);

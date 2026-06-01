@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import CheckIn from "@/lib/models/CheckIn";
 import Client from "@/lib/models/Client";
+import { checkAndAwardAchievements } from "@/lib/achievementService";
 
 // GET /api/checkin - Check-in kayıtlarını getir
 export async function GET(request: Request) {
@@ -50,8 +51,13 @@ export async function GET(request: Request) {
       query.date = { $gte: d, $lt: nextDay };
     }
 
-    const checkIns = await CheckIn.find(query).sort({ date: -1 }).limit(30);
+    // Single-date query → return one record (or null); multi-date → return array
+    if (date) {
+      const record = await CheckIn.findOne(query);
+      return NextResponse.json(record);
+    }
 
+    const checkIns = await CheckIn.find(query).sort({ date: -1 }).limit(30);
     return NextResponse.json(checkIns);
   } catch (error) {
     console.error("CheckIn fetch error:", error);
@@ -136,6 +142,8 @@ export async function POST(request: Request) {
 
     client.lastLoginDate = today;
     await client.save();
+
+    await checkAndAwardAchievements(client._id.toString()).catch(console.error);
 
     return NextResponse.json(checkIn, { status: 201 });
   } catch (error) {

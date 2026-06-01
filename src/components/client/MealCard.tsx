@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { FaPlus, FaFire } from "react-icons/fa";
+import { useState, useMemo } from "react";
+import { FaPlus, FaFire, FaSearch } from "react-icons/fa";
 
 interface MealItem {
   name: string;
@@ -17,17 +17,164 @@ interface MealCardProps {
   mealLabel: string;
   items: MealItem[];
   onAddItem: (mealType: string, item: MealItem) => void;
+  satietyLevel?: number;
+  onSetSatiety: (mealType: string, level: number) => void;
 }
 
-const quickFoods = [
-  { name: "Yumurta (1 adet)", calories: 78, protein: 6, carbs: 1, fat: 5 },
-  { name: "Ekmek (1 dilim)", calories: 80, protein: 3, carbs: 15, fat: 1 },
-  { name: "Tavuk göğsü (100g)", calories: 165, protein: 31, carbs: 0, fat: 4 },
-  { name: "Pilav (1 porsiyon)", calories: 200, protein: 4, carbs: 45, fat: 1 },
-  { name: "Salata (1 porsiyon)", calories: 50, protein: 2, carbs: 10, fat: 0 },
-  { name: "Yoğurt (1 kase)", calories: 100, protein: 8, carbs: 12, fat: 2 },
-  { name: "Muz (1 adet)", calories: 105, protein: 1, carbs: 27, fat: 0 },
-  { name: "Elma (1 adet)", calories: 95, protein: 0, carbs: 25, fat: 0 },
+type QuickFood = { name: string; calories: number; protein: number; carbs: number; fat: number };
+
+const quickFoodCategories: Record<string, QuickFood[]> = {
+  "🥣 Kahvaltı": [
+    { name: "Yumurta (haşlanmış, 1 adet)", calories: 78, protein: 6, carbs: 1, fat: 5 },
+    { name: "Yumurta (sahanda, 1 adet)", calories: 90, protein: 6, carbs: 1, fat: 7 },
+    { name: "Menemen (1 porsiyon)", calories: 200, protein: 10, carbs: 8, fat: 14 },
+    { name: "Ekmek (tam buğday, 1 dilim)", calories: 80, protein: 4, carbs: 15, fat: 1 },
+    { name: "Ekmek (beyaz, 1 dilim)", calories: 70, protein: 2, carbs: 13, fat: 1 },
+    { name: "Simit (1 adet)", calories: 230, protein: 7, carbs: 46, fat: 2 },
+    { name: "Poğaça (1 adet)", calories: 250, protein: 6, carbs: 30, fat: 12 },
+    { name: "Peynir (beyaz, 30g)", calories: 75, protein: 5, carbs: 1, fat: 6 },
+    { name: "Peynir (kaşar, 30g)", calories: 110, protein: 7, carbs: 0, fat: 9 },
+    { name: "Peynir (lor, 50g)", calories: 60, protein: 7, carbs: 2, fat: 3 },
+    { name: "Zeytin (10 adet)", calories: 60, protein: 0, carbs: 1, fat: 6 },
+    { name: "Domates (1 orta boy)", calories: 25, protein: 1, carbs: 5, fat: 0 },
+    { name: "Salatalık (1 adet)", calories: 15, protein: 1, carbs: 3, fat: 0 },
+    { name: "Bal (1 yemek kaşığı)", calories: 64, protein: 0, carbs: 17, fat: 0 },
+    { name: "Tereyağı (1 tatlı kaşığı)", calories: 72, protein: 0, carbs: 0, fat: 8 },
+    { name: "Reçel (1 yemek kaşığı)", calories: 56, protein: 0, carbs: 14, fat: 0 },
+    { name: "Tahin (1 yemek kaşığı)", calories: 89, protein: 3, carbs: 4, fat: 8 },
+    { name: "Sucuk (2 dilim)", calories: 160, protein: 7, carbs: 1, fat: 14 },
+  ],
+  "🍗 Et & Protein": [
+    { name: "Tavuk göğsü (100g)", calories: 165, protein: 31, carbs: 0, fat: 4 },
+    { name: "Tavuk but (100g, deri yok)", calories: 175, protein: 28, carbs: 0, fat: 7 },
+    { name: "Tavuk çorba (1 kase)", calories: 120, protein: 12, carbs: 10, fat: 4 },
+    { name: "Izgara tavuk (1 porsiyon)", calories: 200, protein: 38, carbs: 0, fat: 5 },
+    { name: "Kırmızı et (100g, yağsız)", calories: 190, protein: 26, carbs: 0, fat: 10 },
+    { name: "Köfte (3 adet)", calories: 180, protein: 18, carbs: 5, fat: 10 },
+    { name: "Izgara köfte (1 porsiyon)", calories: 220, protein: 24, carbs: 5, fat: 12 },
+    { name: "Balık (levrek, 100g ızgara)", calories: 97, protein: 19, carbs: 0, fat: 2 },
+    { name: "Balık (somon, 100g)", calories: 208, protein: 20, carbs: 0, fat: 13 },
+    { name: "Balık (hamsi, 100g)", calories: 130, protein: 20, carbs: 0, fat: 5 },
+    { name: "Ton balığı (1 kutu, su ile)", calories: 120, protein: 28, carbs: 0, fat: 1 },
+    { name: "Karides (100g)", calories: 85, protein: 18, carbs: 1, fat: 1 },
+    { name: "Hindi (100g)", calories: 135, protein: 30, carbs: 0, fat: 1 },
+    { name: "Sosis (1 adet)", calories: 100, protein: 5, carbs: 2, fat: 9 },
+    { name: "Yumurta (haşlanmış, 2 adet)", calories: 156, protein: 12, carbs: 2, fat: 10 },
+  ],
+  "🥗 Sebze & Salata": [
+    { name: "Yeşil salata (1 porsiyon)", calories: 30, protein: 2, carbs: 5, fat: 0 },
+    { name: "Çoban salatası (1 porsiyon)", calories: 65, protein: 2, carbs: 10, fat: 2 },
+    { name: "Sezar salata (1 porsiyon)", calories: 180, protein: 7, carbs: 10, fat: 14 },
+    { name: "Mercimek çorbası (1 kase)", calories: 150, protein: 8, carbs: 25, fat: 3 },
+    { name: "Domates çorbası (1 kase)", calories: 100, protein: 3, carbs: 15, fat: 4 },
+    { name: "Sebze çorbası (1 kase)", calories: 80, protein: 3, carbs: 12, fat: 2 },
+    { name: "Brokoli (100g, buharda)", calories: 34, protein: 3, carbs: 7, fat: 0 },
+    { name: "Havuç (1 orta boy)", calories: 30, protein: 1, carbs: 7, fat: 0 },
+    { name: "Ispanak (100g, pişmiş)", calories: 41, protein: 5, carbs: 4, fat: 0 },
+    { name: "Patates (1 orta boy, haşlanmış)", calories: 130, protein: 3, carbs: 30, fat: 0 },
+    { name: "Tatlı patates (100g)", calories: 90, protein: 2, carbs: 21, fat: 0 },
+    { name: "Biber dolması (2 adet)", calories: 180, protein: 8, carbs: 22, fat: 7 },
+    { name: "Zeytinyağlı fasulye (1 porsiyon)", calories: 160, protein: 5, carbs: 20, fat: 7 },
+    { name: "Karnıyarık (1 porsiyon)", calories: 250, protein: 12, carbs: 18, fat: 15 },
+    { name: "İmam bayıldı (1 porsiyon)", calories: 180, protein: 3, carbs: 15, fat: 12 },
+    { name: "Türlü (1 porsiyon)", calories: 120, protein: 4, carbs: 18, fat: 5 },
+    { name: "Bezelye (100g)", calories: 80, protein: 5, carbs: 15, fat: 0 },
+    { name: "Mısır (1 koçan)", calories: 130, protein: 5, carbs: 27, fat: 2 },
+  ],
+  "🍚 Karbonhidrat": [
+    { name: "Pilav (1 porsiyon, 200g)", calories: 200, protein: 4, carbs: 45, fat: 1 },
+    { name: "Bulgur pilavı (1 porsiyon)", calories: 180, protein: 5, carbs: 38, fat: 2 },
+    { name: "Makarna (1 porsiyon, 200g)", calories: 220, protein: 8, carbs: 44, fat: 2 },
+    { name: "Makarna (tam buğday, 200g)", calories: 200, protein: 8, carbs: 40, fat: 2 },
+    { name: "Lazanya (1 porsiyon)", calories: 350, protein: 15, carbs: 40, fat: 15 },
+    { name: "Börek (ıspanaklı, 1 dilim)", calories: 280, protein: 8, carbs: 25, fat: 17 },
+    { name: "Börek (peynirli, 1 dilim)", calories: 300, protein: 10, carbs: 25, fat: 18 },
+    { name: "Su böreği (1 dilim)", calories: 260, protein: 10, carbs: 28, fat: 13 },
+    { name: "Gözleme (peynirli, 1 adet)", calories: 320, protein: 12, carbs: 35, fat: 16 },
+    { name: "Gözleme (ıspanaklı, 1 adet)", calories: 280, protein: 10, carbs: 33, fat: 13 },
+    { name: "Pide (1 dilim)", calories: 250, protein: 8, carbs: 40, fat: 8 },
+    { name: "Lahmacun (1 adet)", calories: 200, protein: 10, carbs: 30, fat: 6 },
+    { name: "Döner (et, 1 porsiyon)", calories: 400, protein: 30, carbs: 10, fat: 26 },
+    { name: "Sandviç (tam buğday)", calories: 280, protein: 15, carbs: 35, fat: 8 },
+    { name: "Ekmek (2 dilim)", calories: 160, protein: 6, carbs: 30, fat: 2 },
+    { name: "Baklava (2 dilim)", calories: 450, protein: 5, carbs: 55, fat: 25 },
+  ],
+  "🥛 Süt & Yoğurt": [
+    { name: "Yoğurt (sade, 150g)", calories: 90, protein: 8, carbs: 10, fat: 2 },
+    { name: "Yoğurt (tam yağlı, 150g)", calories: 130, protein: 7, carbs: 9, fat: 7 },
+    { name: "Yoğurt (meyveli, 125g)", calories: 120, protein: 5, carbs: 20, fat: 2 },
+    { name: "Süzme yoğurt (100g)", calories: 100, protein: 10, carbs: 5, fat: 4 },
+    { name: "Ayran (1 bardak, 250ml)", calories: 60, protein: 4, carbs: 5, fat: 2 },
+    { name: "Süt (yarım yağlı, 1 bardak)", calories: 100, protein: 8, carbs: 12, fat: 3 },
+    { name: "Süt (tam yağlı, 1 bardak)", calories: 150, protein: 8, carbs: 11, fat: 8 },
+    { name: "Kefir (1 bardak)", calories: 100, protein: 8, carbs: 10, fat: 3 },
+    { name: "Sütlaç (1 porsiyon)", calories: 200, protein: 6, carbs: 38, fat: 4 },
+    { name: "Muhallebi (1 porsiyon)", calories: 190, protein: 5, carbs: 35, fat: 4 },
+    { name: "Kazandibi (1 porsiyon)", calories: 220, protein: 6, carbs: 40, fat: 5 },
+  ],
+  "🍎 Meyve": [
+    { name: "Elma (1 orta boy)", calories: 95, protein: 0, carbs: 25, fat: 0 },
+    { name: "Muz (1 adet)", calories: 105, protein: 1, carbs: 27, fat: 0 },
+    { name: "Portakal (1 adet)", calories: 65, protein: 1, carbs: 16, fat: 0 },
+    { name: "Mandalina (2 adet)", calories: 70, protein: 1, carbs: 18, fat: 0 },
+    { name: "Üzüm (1 küçük salkım, 100g)", calories: 70, protein: 1, carbs: 18, fat: 0 },
+    { name: "Çilek (100g)", calories: 32, protein: 1, carbs: 8, fat: 0 },
+    { name: "Karpuz (2 dilim, 200g)", calories: 60, protein: 1, carbs: 15, fat: 0 },
+    { name: "Kavun (2 dilim, 200g)", calories: 55, protein: 1, carbs: 13, fat: 0 },
+    { name: "Armut (1 adet)", calories: 100, protein: 1, carbs: 27, fat: 0 },
+    { name: "Şeftali (1 adet)", calories: 60, protein: 1, carbs: 14, fat: 0 },
+    { name: "Kiraz (10 adet)", calories: 50, protein: 1, carbs: 12, fat: 0 },
+    { name: "Kivi (1 adet)", calories: 50, protein: 1, carbs: 12, fat: 0 },
+    { name: "Ananas (2 dilim)", calories: 80, protein: 1, carbs: 20, fat: 0 },
+    { name: "Nar (1 adet)", calories: 130, protein: 2, carbs: 31, fat: 1 },
+    { name: "İncir (2 adet)", calories: 80, protein: 1, carbs: 20, fat: 0 },
+    { name: "Hurma (3 adet)", calories: 100, protein: 1, carbs: 25, fat: 0 },
+  ],
+  "🌰 Kuruyemiş & Atıştırmalık": [
+    { name: "Badem (10 adet)", calories: 70, protein: 3, carbs: 3, fat: 6 },
+    { name: "Ceviz (4 yarım)", calories: 100, protein: 2, carbs: 2, fat: 10 },
+    { name: "Fıstık (1 avuç, 30g)", calories: 170, protein: 7, carbs: 6, fat: 14 },
+    { name: "Fındık (10 adet)", calories: 90, protein: 2, carbs: 2, fat: 9 },
+    { name: "Antep fıstığı (1 avuç)", calories: 160, protein: 6, carbs: 8, fat: 13 },
+    { name: "Leblebi (1 avuç, 30g)", calories: 120, protein: 6, carbs: 20, fat: 2 },
+    { name: "Kaju (10 adet)", calories: 90, protein: 2, carbs: 5, fat: 7 },
+    { name: "Kuru incir (3 adet)", calories: 110, protein: 1, carbs: 28, fat: 0 },
+    { name: "Kuru kayısı (5 adet)", calories: 80, protein: 1, carbs: 21, fat: 0 },
+    { name: "Kuru üzüm (1 avuç)", calories: 90, protein: 1, carbs: 23, fat: 0 },
+    { name: "Bisküvi (petit beurre, 3 adet)", calories: 90, protein: 1, carbs: 15, fat: 3 },
+    { name: "Gofret (1 adet)", calories: 130, protein: 2, carbs: 18, fat: 6 },
+    { name: "Çikolata (sütlü, 2 kare)", calories: 100, protein: 1, carbs: 11, fat: 6 },
+    { name: "Çikolata (bitter, 2 kare)", calories: 90, protein: 1, carbs: 9, fat: 6 },
+    { name: "Kraker (5 adet)", calories: 80, protein: 2, carbs: 14, fat: 2 },
+    { name: "Mısır cipsi (küçük paket)", calories: 150, protein: 2, carbs: 20, fat: 7 },
+    { name: "Granola bar (1 adet)", calories: 200, protein: 4, carbs: 30, fat: 7 },
+  ],
+  "🥤 İçecek": [
+    { name: "Su (1 bardak)", calories: 0, protein: 0, carbs: 0, fat: 0 },
+    { name: "Çay (şekersiz)", calories: 2, protein: 0, carbs: 0, fat: 0 },
+    { name: "Çay (1 şekerli)", calories: 30, protein: 0, carbs: 8, fat: 0 },
+    { name: "Türk kahvesi (sade)", calories: 5, protein: 0, carbs: 0, fat: 0 },
+    { name: "Türk kahvesi (orta şekerli)", calories: 30, protein: 0, carbs: 7, fat: 0 },
+    { name: "Filtre kahve (sütlü)", calories: 50, protein: 2, carbs: 5, fat: 2 },
+    { name: "Latte (orta boy)", calories: 150, protein: 8, carbs: 15, fat: 6 },
+    { name: "Taze sıkılmış portakal suyu (1 bardak)", calories: 110, protein: 2, carbs: 26, fat: 0 },
+    { name: "Meyve suyu (hazır, 1 kutu)", calories: 130, protein: 0, carbs: 32, fat: 0 },
+    { name: "Kola (1 kutu, 330ml)", calories: 140, protein: 0, carbs: 39, fat: 0 },
+    { name: "Kola (light, 1 kutu)", calories: 2, protein: 0, carbs: 0, fat: 0 },
+    { name: "Limonata (1 bardak)", calories: 100, protein: 0, carbs: 25, fat: 0 },
+    { name: "Protein shake (1 porsiyon)", calories: 150, protein: 25, carbs: 8, fat: 3 },
+  ],
+};
+
+const ALL_KEY = "⭐ Tümü";
+const CATEGORY_KEYS = Object.keys(quickFoodCategories);
+
+const satietyOptions = [
+  { level: 1, emoji: "😫", label: "Çok Aç" },
+  { level: 2, emoji: "😕", label: "Aç" },
+  { level: 3, emoji: "😊", label: "Normal" },
+  { level: 4, emoji: "😄", label: "Tok" },
+  { level: 5, emoji: "🤩", label: "Çok Tok" },
 ];
 
 export default function MealCard({
@@ -35,6 +182,8 @@ export default function MealCard({
   mealLabel,
   items,
   onAddItem,
+  satietyLevel,
+  onSetSatiety,
 }: MealCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -43,14 +192,25 @@ export default function MealCard({
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  const [activeCategory, setActiveCategory] = useState(ALL_KEY);
+  const [search, setSearch] = useState("");
 
   const total = items.reduce((sum, item) => sum + item.calories, 0);
-  const totalProtein = items.reduce(
-    (sum, item) => sum + (item.protein || 0),
-    0,
-  );
+  const totalProtein = items.reduce((sum, item) => sum + (item.protein || 0), 0);
   const totalCarbs = items.reduce((sum, item) => sum + (item.carbs || 0), 0);
   const totalFat = items.reduce((sum, item) => sum + (item.fat || 0), 0);
+
+  const allFoods: QuickFood[] = useMemo(
+    () => CATEGORY_KEYS.flatMap((k) => quickFoodCategories[k]),
+    [],
+  );
+
+  const displayedFoods = useMemo(() => {
+    const base = activeCategory === ALL_KEY ? allFoods : (quickFoodCategories[activeCategory] ?? []);
+    if (!search.trim()) return base;
+    const q = search.toLowerCase();
+    return base.filter((f) => f.name.toLowerCase().includes(q));
+  }, [activeCategory, search, allFoods]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,10 +233,12 @@ export default function MealCard({
     setCarbs("");
     setFat("");
     setShowAdvanced(false);
+    setSearch("");
+    setActiveCategory(ALL_KEY);
     setShowModal(false);
   };
 
-  const selectQuickFood = (food: (typeof quickFoods)[0]) => {
+  const selectQuickFood = (food: QuickFood) => {
     setName(food.name);
     setCalories(food.calories.toString());
     setProtein(food.protein.toString());
@@ -110,9 +272,9 @@ export default function MealCard({
                     <span className="text-gray-900">{item.name}</span>
                     {(item.protein || item.carbs || item.fat) && (
                       <div className="flex gap-2 mt-0.5 text-[10px] text-gray-400">
-                        {item.protein && <span>P: {item.protein}g</span>}
-                        {item.carbs && <span>K: {item.carbs}g</span>}
-                        {item.fat && <span>Y: {item.fat}g</span>}
+                        {item.protein ? <span>P: {item.protein}g</span> : null}
+                        {item.carbs ? <span>K: {item.carbs}g</span> : null}
+                        {item.fat ? <span>Y: {item.fat}g</span> : null}
                       </div>
                     )}
                   </div>
@@ -123,7 +285,7 @@ export default function MealCard({
                 </li>
               ))}
             </ul>
-            <div className="border-t pt-3 space-y-1">
+            <div className="border-t pt-3 space-y-1 mb-4">
               <div className="flex justify-between text-sm font-bold text-gray-900">
                 <span>Toplam</span>
                 <span className="text-emerald-600">{total} kcal</span>
@@ -136,143 +298,168 @@ export default function MealCard({
                 </div>
               )}
             </div>
+
+            {/* Satiety check-in */}
+            <div className="border-t pt-3">
+              <p className="text-xs text-gray-500 mb-2">Tokluk Durumu</p>
+              <div className="flex gap-1.5">
+                {satietyOptions.map((opt) => (
+                  <button
+                    key={opt.level}
+                    type="button"
+                    onClick={() => onSetSatiety(mealType, opt.level)}
+                    title={opt.label}
+                    className={`flex-1 flex flex-col items-center py-1.5 rounded-lg border-2 transition text-xs gap-0.5 ${
+                      satietyLevel === opt.level
+                        ? "border-emerald-500 bg-emerald-50"
+                        : "border-gray-100 hover:border-emerald-300 bg-gray-50"
+                    }`}
+                  >
+                    <span className="text-lg leading-none">{opt.emoji}</span>
+                    <span className={`hidden sm:block leading-none ${satietyLevel === opt.level ? "text-emerald-700 font-medium" : "text-gray-400"}`}>
+                      {opt.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {satietyLevel && (
+                <p className="text-xs text-center text-emerald-600 mt-1.5">
+                  {satietyOptions.find((o) => o.level === satietyLevel)?.emoji}{" "}
+                  {satietyOptions.find((o) => o.level === satietyLevel)?.label} kaydedildi
+                </p>
+              )}
+            </div>
           </>
         ) : (
-          <p className="text-sm text-gray-400 text-center py-4">
-            Henüz yemek eklenmedi
-          </p>
+          <p className="text-sm text-gray-400 text-center py-4">Henüz yemek eklenmedi</p>
         )}
       </div>
 
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
-              <h3 className="font-semibold text-gray-900">
-                {mealLabel} - Yemek Ekle
-              </h3>
-              <button
-                onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
-              >
-                ✕
-              </button>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden max-h-[92vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <h3 className="font-semibold text-gray-900">{mealLabel} — Yemek Ekle</h3>
+              <button onClick={resetForm} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
             </div>
 
-            {/* Quick Foods */}
-            <div className="px-6 py-3 border-b border-gray-100 bg-gray-50">
-              <p className="text-xs text-gray-500 mb-2">Hızlı Seçim</p>
-              <div className="flex flex-wrap gap-1.5">
-                {quickFoods.slice(0, 6).map((food) => (
+            {/* Quick Foods Section */}
+            <div className="flex-shrink-0 bg-gray-50 border-b border-gray-100">
+              <div className="px-4 pt-3 pb-2">
+                <p className="text-xs font-medium text-gray-500 mb-2">⚡ Hızlı Seçim</p>
+                {/* Search */}
+                <div className="relative mb-2">
+                  <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Yemek ara..."
+                    className="w-full pl-8 pr-4 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                {/* Category tabs */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                  {[ALL_KEY, ...CATEGORY_KEYS].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => { setActiveCategory(cat); setSearch(""); }}
+                      className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition whitespace-nowrap ${
+                        activeCategory === cat
+                          ? "bg-emerald-500 text-white"
+                          : "bg-white text-gray-600 border border-gray-200 hover:border-emerald-300"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Food list */}
+              <div className="px-4 pb-3 max-h-44 overflow-y-auto">
+                {displayedFoods.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-2 text-center">Sonuç bulunamadı</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {displayedFoods.map((food) => (
+                      <button
+                        key={food.name}
+                        type="button"
+                        onClick={() => selectQuickFood(food)}
+                        className="px-2.5 py-1 bg-white text-xs text-gray-700 rounded-lg border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition text-left"
+                        title={`${food.calories} kcal | P:${food.protein}g K:${food.carbs}g Y:${food.fat}g`}
+                      >
+                        {food.name.split(" (")[0]}
+                        <span className="text-gray-400 ml-1">{food.calories}k</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Yemek Adı</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Örn: Tavuk göğsü"
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Kalori (kcal)</label>
+                  <input
+                    type="number"
+                    value={calories}
+                    onChange={(e) => setCalories(e.target.value)}
+                    placeholder="250"
+                    required
+                    min="1"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                  />
+                </div>
+                <div className="flex items-end">
                   <button
-                    key={food.name}
                     type="button"
-                    onClick={() => selectQuickFood(food)}
-                    className="px-2 py-1 bg-white text-xs text-gray-700 rounded-lg border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full py-2.5 text-sm text-emerald-600 hover:text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition"
                   >
-                    {food.name.split(" (")[0]}
+                    {showAdvanced ? "− Makro Gizle" : "+ Makro Ekle"}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Yemek Adı
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Örn: Tavuk göğsü"
-                  required
-                  autoFocus
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kalori (kcal)
-                </label>
-                <input
-                  type="number"
-                  value={calories}
-                  onChange={(e) => setCalories(e.target.value)}
-                  placeholder="Örn: 250"
-                  required
-                  min="1"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                />
+                </div>
               </div>
 
-              {/* Advanced Toggle */}
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
-              >
-                {showAdvanced ? "- Basit Görünüm" : "+ Makro Değerler Ekle"}
-              </button>
-
-              {/* Advanced Fields */}
               {showAdvanced && (
                 <div className="grid grid-cols-3 gap-3 p-3 bg-gray-50 rounded-lg">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      Protein (g)
-                    </label>
-                    <input
-                      type="number"
-                      value={protein}
-                      onChange={(e) => setProtein(e.target.value)}
-                      placeholder="0"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 text-gray-900"
-                    />
+                    <label className="block text-xs text-gray-500 mb-1">Protein (g)</label>
+                    <input type="number" value={protein} onChange={(e) => setProtein(e.target.value)} placeholder="0" min="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 text-gray-900" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      Karb (g)
-                    </label>
-                    <input
-                      type="number"
-                      value={carbs}
-                      onChange={(e) => setCarbs(e.target.value)}
-                      placeholder="0"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 text-gray-900"
-                    />
+                    <label className="block text-xs text-gray-500 mb-1">Karb (g)</label>
+                    <input type="number" value={carbs} onChange={(e) => setCarbs(e.target.value)} placeholder="0" min="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 text-gray-900" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      Yağ (g)
-                    </label>
-                    <input
-                      type="number"
-                      value={fat}
-                      onChange={(e) => setFat(e.target.value)}
-                      placeholder="0"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-900"
-                    />
+                    <label className="block text-xs text-gray-500 mb-1">Yağ (g)</label>
+                    <input type="number" value={fat} onChange={(e) => setFat(e.target.value)} placeholder="0" min="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-900" />
                   </div>
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
-                >
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={resetForm} className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
                   İptal
                 </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition"
-                >
+                <button type="submit" className="flex-1 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition">
                   Kaydet
                 </button>
               </div>

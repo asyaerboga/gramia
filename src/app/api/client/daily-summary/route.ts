@@ -83,12 +83,10 @@ export async function GET() {
       0,
     );
 
-    // Today's sleep (previous night)
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Today's sleep — saved with today's date from the wellness page
     const todaySleep = await Sleep.findOne({
       clientId: client._id,
-      date: { $gte: yesterday, $lt: today },
+      date: { $gte: today, $lt: tomorrow },
     });
 
     // Today's check-in

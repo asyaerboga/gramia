@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Meal from "@/lib/models/Meal";
 import Client from "@/lib/models/Client";
+import { checkAndAwardAchievements } from "@/lib/achievementService";
 
 // GET /api/meals - Get meals for a date
 export async function GET(request: Request) {
@@ -94,6 +95,8 @@ export async function POST(request: Request) {
       mealType,
       items,
     });
+
+    await checkAndAwardAchievements(client._id.toString()).catch(console.error);
 
     return NextResponse.json(meal, { status: 201 });
   } catch (error) {

@@ -100,7 +100,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { appointmentId, status, notes } = body;
+    const { appointmentId, status, notes, date, time } = body;
 
     if (!appointmentId) {
       return NextResponse.json(
@@ -124,6 +124,11 @@ export async function PATCH(request: Request) {
       if (appointment.dietitianId.toString() !== session.user.id) {
         return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
       }
+      // Diyetisyen tüm alanları güncelleyebilir
+      if (status) appointment.status = status;
+      if (notes !== undefined) appointment.notes = notes;
+      if (date) appointment.date = new Date(date);
+      if (time) appointment.time = time;
     } else {
       // Client sadece iptal edebilir
       const client = await Client.findOne({ userId: session.user.id });
@@ -139,10 +144,8 @@ export async function PATCH(request: Request) {
           { status: 403 },
         );
       }
+      if (status) appointment.status = status;
     }
-
-    if (status) appointment.status = status;
-    if (notes !== undefined) appointment.notes = notes;
 
     await appointment.save();
 

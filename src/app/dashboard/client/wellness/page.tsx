@@ -11,7 +11,16 @@ import {
   FaUtensils,
   FaCheckCircle,
   FaChartLine,
+  FaHeartbeat,
 } from "react-icons/fa";
+
+interface BloodTestRecord {
+  _id: string;
+  imageUrl: string;
+  originalName: string;
+  notes?: string;
+  testDate: string;
+}
 
 interface Sleep {
   _id?: string;
@@ -55,7 +64,16 @@ export default function WellnessPage() {
   const [sleep, setSleep] = useState<Sleep | null>(null);
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"sleep" | "checkin">("checkin");
+  const [tab, setTab] = useState<"sleep" | "checkin" | "health">("checkin");
+
+  // Weekly sleep history for summary chart
+  const [weeklySleep, setWeeklySleep] = useState<Sleep[]>([]);
+
+  // Health state (read-only)
+  const [chronicDiseases, setChronicDiseases] = useState<string[]>([]);
+  const [bloodTests, setBloodTests] = useState<BloodTestRecord[]>([]);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const { success, error } = useToast();
 
   // Sleep form
@@ -76,6 +94,35 @@ export default function WellnessPage() {
     notes: "",
   });
 
+  const fetchHealth = useCallback(async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch("/api/client/health");
+      if (res.ok) {
+        const data = await res.json();
+        setChronicDiseases(data.chronicDiseases || []);
+        setBloodTests(data.bloodTests || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch health:", err);
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
+  const fetchWeeklySleep = useCallback(async () => {
+    try {
+      const res = await fetch("/api/sleep");
+      if (res.ok) {
+        const data: Sleep[] = await res.json();
+        // Keep last 7 days
+        setWeeklySleep(data.slice(0, 7));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -95,7 +142,9 @@ export default function WellnessPage() {
             notes: data.notes || "",
           });
         } else {
+          // Reset form to defaults when no record for this date
           setSleep(null);
+          setSleepForm({ bedTime: "23:00", wakeTime: "07:00", quality: 3, notes: "" });
         }
       }
 
@@ -112,7 +161,9 @@ export default function WellnessPage() {
             notes: data.notes || "",
           });
         } else {
+          // Reset form to defaults when no record for this date
           setCheckIn(null);
+          setCheckInForm({ mood: 3, energyLevel: 3, stressLevel: 3, hungerLevel: 3, symptoms: [], notes: "" });
         }
       }
     } catch (err) {
@@ -125,6 +176,14 @@ export default function WellnessPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    fetchWeeklySleep();
+  }, [fetchWeeklySleep]);
+
+  useEffect(() => {
+    if (tab === "health") fetchHealth();
+  }, [tab, fetchHealth]);
 
   const calculateDuration = (bed: string, wake: string): number => {
     const [bedH, bedM] = bed.split(":").map(Number);
@@ -150,6 +209,7 @@ export default function WellnessPage() {
       if (res.ok) {
         success("Uyku Kaydedildi", "Uyku bilgileriniz güncellendi.");
         fetchData();
+        fetchWeeklySleep();
       } else {
         error("Hata", "Uyku kaydedilirken bir hata oluştu.");
       }
@@ -220,7 +280,7 @@ export default function WellnessPage() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setTab("checkin")}
-            className={`flex-1 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 text-sm ${
               tab === "checkin"
                 ? "bg-indigo-500 text-white"
                 : "bg-white text-gray-600 border border-gray-200 hover:border-indigo-300"
@@ -231,7 +291,7 @@ export default function WellnessPage() {
           </button>
           <button
             onClick={() => setTab("sleep")}
-            className={`flex-1 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 text-sm ${
               tab === "sleep"
                 ? "bg-indigo-500 text-white"
                 : "bg-white text-gray-600 border border-gray-200 hover:border-indigo-300"
@@ -240,9 +300,95 @@ export default function WellnessPage() {
             <FaMoon /> Uyku Kaydı
             {sleep && <FaCheckCircle className="text-green-300" />}
           </button>
+          <button
+            onClick={() => setTab("health")}
+            className={`flex-1 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 text-sm ${
+              tab === "health"
+                ? "bg-red-500 text-white"
+                : "bg-white text-gray-600 border border-gray-200 hover:border-red-300"
+            }`}
+          >
+            <FaHeartbeat /> Sağlık
+          </button>
         </div>
 
-        {loading ? (
+        {tab === "health" ? (
+          healthLoading ? (
+            <div className="bg-white rounded-2xl p-8">
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 bg-gray-200 rounded w-1/3" />
+                <div className="h-32 bg-gray-200 rounded" />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Kronik Hastalıklar */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                  🏥 Kronik Hastalıklarım
+                </h2>
+                {chronicDiseases.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    Diyetisyeniniz henüz kronik hastalık kaydı eklememiş.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {chronicDiseases.map((d) => (
+                      <span
+                        key={d}
+                        className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-full text-sm"
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-4">
+                  Bu bilgiler diyetisyeniniz tarafından girilmektedir. Değişiklik için diyetisyeninizle iletişime geçin.
+                </p>
+              </div>
+
+              {/* Kan Tahlilleri */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                  🔬 Kan Tahlillerim
+                </h2>
+                {bloodTests.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    Diyetisyeniniz henüz kan tahlili yüklememiş.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {bloodTests.map((bt) => (
+                      <button
+                        key={bt._id}
+                        onClick={() => setLightboxUrl(bt.imageUrl)}
+                        className="group text-left"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={bt.imageUrl}
+                          alt={bt.originalName}
+                          className="w-full aspect-square object-cover rounded-xl border border-gray-200 group-hover:opacity-80 transition"
+                        />
+                        <p className="text-xs text-gray-500 mt-1 truncate">
+                          {new Date(bt.testDate).toLocaleDateString("tr-TR", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                        {bt.notes && (
+                          <p className="text-xs text-gray-400 truncate">{bt.notes}</p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        ) : loading ? (
           <div className="bg-white rounded-2xl p-8">
             <div className="animate-pulse space-y-4">
               <div className="h-8 bg-gray-200 rounded w-1/3" />
@@ -543,15 +689,63 @@ export default function WellnessPage() {
           </div>
         )}
 
-        {/* Weekly Summary (if viewing today) */}
-        {isToday && (
+        {/* Lightbox */}
+        {lightboxUrl && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <div className="relative max-w-3xl max-h-[90vh] mx-4" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setLightboxUrl(null)}
+                className="absolute -top-10 right-0 text-white text-3xl leading-none hover:text-gray-300"
+              >
+                ✕
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxUrl}
+                alt="Kan tahlili"
+                className="max-w-full max-h-[85vh] rounded-xl object-contain"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Weekly Sleep Summary */}
+        {isToday && tab !== "health" && weeklySleep.length > 0 && (
           <div className="mt-6 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              📊 Bu Hafta Özeti
+              📊 Son {weeklySleep.length} Gün Uyku Özeti
             </h3>
-            <p className="text-sm text-gray-500 text-center py-8">
-              Haftalık trend verileri yakında burada!
-            </p>
+            <div className="flex items-end gap-2 h-28">
+              {[...weeklySleep].reverse().map((s, i) => {
+                const maxH = 10;
+                const pct = Math.min((s.duration / maxH) * 100, 100);
+                const colorClass =
+                  s.duration >= 7
+                    ? "bg-indigo-500"
+                    : s.duration >= 6
+                    ? "bg-indigo-300"
+                    : "bg-red-300";
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <span className="text-xs text-gray-500">{s.duration}s</span>
+                    <div className="w-full rounded-t-md" style={{ height: `${pct}%`, minHeight: 4 }} title={`${s.duration} saat`}>
+                      <div className={`w-full h-full rounded-t-md ${colorClass}`} />
+                    </div>
+                    <span className="text-[9px] text-gray-400">
+                      {new Date(s.date).toLocaleDateString("tr-TR", { weekday: "short" })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex gap-4 mt-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-indigo-500 inline-block" /> ≥7 saat (ideal)</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-indigo-300 inline-block" /> 6-7 saat</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-300 inline-block" /> &lt;6 saat</span>
+            </div>
           </div>
         )}
       </div>

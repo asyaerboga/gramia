@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Exercise from "@/lib/models/Exercise";
 import Client from "@/lib/models/Client";
+import { checkAndAwardAchievements } from "@/lib/achievementService";
 
 // GET /api/exercises - Egzersiz kayıtlarını getir
 export async function GET(request: Request) {
@@ -99,6 +100,9 @@ export async function POST(request: Request) {
       intensity: intensity || "medium",
       notes,
     });
+
+    // Await achievement check so it completes before response
+    await checkAndAwardAchievements(client._id.toString()).catch(console.error);
 
     return NextResponse.json(exercise, { status: 201 });
   } catch (error) {

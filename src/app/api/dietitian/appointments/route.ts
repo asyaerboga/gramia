@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
@@ -6,7 +6,7 @@ import Appointment from "@/lib/models/Appointment";
 import Client from "@/lib/models/Client";
 
 // GET /api/dietitian/appointments - Get all appointments for the dietitian
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "dietitian") {
@@ -18,12 +18,20 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const upcoming = searchParams.get("upcoming");
 
+    const pendingReview = searchParams.get("pendingReview");
+
     const query: Record<string, unknown> = {
       dietitianId: session.user.id,
     };
 
     if (upcoming === "true") {
       query.date = { $gte: new Date() };
+    }
+
+    if (pendingReview === "true") {
+      // Past appointments still in pending or confirmed status
+      query.date = { $lt: new Date() };
+      query.status = { $in: ["pending", "confirmed"] };
     }
 
     const appointments = await Appointment.find(query)
@@ -67,5 +75,42 @@ export async function GET(request: Request) {
       { error: "Sunucu hatası" },
       { status: 500 }
     );
+  }
+}
+
+// PATCH /api/dietitian/appointments - Update appointment (status, date, time, notes)
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "dietitian") {
+      return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
+    }
+
+    const { appointmentId, status, date, time, notes } = await request.json();
+    if (!appointmentId) {
+      return NextResponse.json({ error: "appointmentId gereklidir" }, { status: 400 });
+    }
+
+    await dbConnect();
+
+    const appointment = await Appointment.findOne({
+      _id: appointmentId,
+      dietitianId: session.user.id,
+    });
+
+    if (!appointment) {
+      return NextResponse.json({ error: "Randevu bulunamadı" }, { status: 404 });
+    }
+
+    if (status) appointment.status = status;
+    if (date) appointment.date = new Date(date);
+    if (time) appointment.time = time;
+    if (notes !== undefined) appointment.notes = notes;
+
+    await appointment.save();
+    return NextResponse.json({ message: "Güncellendi", appointment });
+  } catch (error) {
+    console.error("PATCH dietitian appointment error:", error);
+    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
   }
 }

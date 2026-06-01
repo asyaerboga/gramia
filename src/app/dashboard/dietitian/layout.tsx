@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { ReactNode, useEffect, useState, useCallback } from "react";
+import { ReactNode, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,55 +13,78 @@ import {
   FaSignOutAlt,
   FaBars,
   FaTimes,
+  FaCog,
+  FaCommentDots,
 } from "react-icons/fa";
+import { useToast } from "@/components/providers/ToastProvider";
 
 const dietitianNavItems = [
-  {
-    href: "/dashboard/dietitian",
-    icon: <FaHome />,
-    label: "Dashboard",
-    exact: true,
-  },
-  {
-    href: "/dashboard/dietitian/clients",
-    icon: <FaUsers />,
-    label: "Danışanlar",
-  },
-  {
-    href: "/dashboard/dietitian/appointments",
-    icon: <FaCalendarAlt />,
-    label: "Randevular",
-  },
-  {
-    href: "/dashboard/dietitian/messages",
-    icon: <FaComments />,
-    label: "Mesaj",
-  },
+  { href: "/dashboard/dietitian",              icon: <FaHome />,        label: "Dashboard",  exact: true },
+  { href: "/dashboard/dietitian/clients",      icon: <FaUsers />,       label: "Danışanlar" },
+  { href: "/dashboard/dietitian/appointments", icon: <FaCalendarAlt />, label: "Randevular" },
+  { href: "/dashboard/dietitian/messages",     icon: <FaComments />,    label: "Mesaj" },
+  { href: "/dashboard/dietitian/settings",     icon: <FaCog />,         label: "Ayarlar" },
 ];
+
+interface UnreadSender {
+  senderId: string;
+  senderName: string;
+  count: number;
+  lastMessage: string;
+}
 
 export default function DietitianLayout({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const prevSendersRef = useRef<Map<string, number>>(new Map());
+  const { showToast } = useToast();
 
-  const fetchUnreadCount = useCallback(async () => {
+  // Heartbeat — keep presence alive every 30s
+  useEffect(() => {
+    const ping = () => fetch("/api/presence", { method: "POST" }).catch(() => {});
+    ping();
+    const id = setInterval(ping, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const fetchUnread = useCallback(async () => {
     try {
-      const res = await fetch("/api/messages/unread-count");
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.count);
+      // Total badge
+      const countRes = await fetch("/api/messages/unread-count");
+      if (countRes.ok) {
+        const { count } = await countRes.json();
+        setUnreadCount(count);
       }
+
+      // Per-sender — for toast notifications
+      const senderRes = await fetch("/api/messages/unread-per-sender");
+      if (!senderRes.ok) return;
+      const senders: UnreadSender[] = await senderRes.json();
+
+      // Detect new/increased unread from senders
+      for (const s of senders) {
+        const prev = prevSendersRef.current.get(s.senderId) ?? 0;
+        if (s.count > prev) {
+          showToast("info", `💬 ${s.senderName}`, s.lastMessage, 7500);
+        }
+      }
+
+      // Update prev map
+      const newMap = new Map<string, number>();
+      for (const s of senders) newMap.set(s.senderId, s.count);
+      prevSendersRef.current = newMap;
     } catch {
       // ignore
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 5000);
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 5000);
     return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
+  }, [fetchUnread]);
 
   if (status === "loading") {
     return (
@@ -84,31 +107,22 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
         >
-          {sidebarOpen ? (
-            <FaTimes className="text-xl" />
-          ) : (
-            <FaBars className="text-xl" />
-          )}
+          {sidebarOpen ? <FaTimes className="text-xl" /> : <FaBars className="text-xl" />}
         </button>
       </div>
 
       {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-20"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="lg:hidden fixed inset-0 bg-black/50 z-20" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
-      <nav
-        className={`
+      <nav className={`
         fixed left-0 top-0 h-screen bg-white shadow-md p-6 flex flex-col z-30
         w-64 lg:w-1/5
         transition-transform duration-300 ease-in-out
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-      `}
-      >
+      `}>
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-emerald-600">🌿 Gramia</h1>
           <p className="text-xs text-gray-400 mt-1">Dr. {session.user.name}</p>
@@ -151,9 +165,9 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Sidebar spacer */}
-      <div className="hidden lg:block lg:w-1/5 flex-shrink-0" />
+      <div className="hidden lg:block lg:w-1/5 shrink-0" />
 
-      {/* Main content area */}
+      {/* Main content */}
       <div className="flex-1 min-h-screen pt-14 lg:pt-0">{children}</div>
     </div>
   );

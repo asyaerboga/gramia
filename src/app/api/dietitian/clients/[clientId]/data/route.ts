@@ -7,6 +7,7 @@ import Exercise from "@/lib/models/Exercise";
 import Sleep from "@/lib/models/Sleep";
 import CheckIn from "@/lib/models/CheckIn";
 import Meal from "@/lib/models/Meal";
+import MealSatiety from "@/lib/models/MealSatiety";
 import WaterIntake from "@/lib/models/WaterIntake";
 import Achievement, { ACHIEVEMENT_DEFINITIONS } from "@/lib/models/Achievement";
 
@@ -154,6 +155,11 @@ export async function GET(
         date: { $gte: startDate },
       }).sort({ date: -1 });
 
+      const satietyRecords = await MealSatiety.find({
+        clientId,
+        date: { $gte: startDate },
+      }).sort({ date: -1 });
+
       const totalCalories = meals.reduce((sum, m) => sum + m.totalCalories, 0);
       const avgCaloriesPerDay = meals.length > 0 ? totalCalories / days : 0;
 
@@ -175,14 +181,23 @@ export async function GET(
           (dailyCalories[dateKey] || 0) + m.totalCalories;
       });
 
+      // Satiety summary
+      const avgSatiety =
+        satietyRecords.length > 0
+          ? satietyRecords.reduce((sum, s) => sum + s.satietyLevel, 0) /
+            satietyRecords.length
+          : 0;
+
       result.meals = {
         items: meals,
+        satietyRecords,
         summary: {
           totalMeals: meals.length,
           totalCalories,
           avgCaloriesPerDay: Math.round(avgCaloriesPerDay),
           byType,
           dailyCalories,
+          avgSatiety: Math.round(avgSatiety * 10) / 10,
         },
       };
     }

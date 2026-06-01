@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { redirect } from "next/navigation";
-import { ReactNode, useEffect, useState, useCallback } from "react";
+import { ReactNode, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
   FaBars,
   FaTimes,
 } from "react-icons/fa";
+import { useToast } from "@/components/providers/ToastProvider";
 
 const clientNavItems = [
   {
@@ -61,29 +62,61 @@ const clientNavItems = [
   { href: "/dashboard/client/settings", icon: <FaCog />, label: "Ayarlar" },
 ];
 
+interface UnreadSender {
+  senderId: string;
+  senderName: string;
+  count: number;
+  lastMessage: string;
+}
+
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const prevSendersRef = useRef<Map<string, number>>(new Map());
+  const { showToast } = useToast();
 
-  const fetchUnreadCount = useCallback(async () => {
+  // Heartbeat — keep presence alive
+  useEffect(() => {
+    const ping = () => fetch("/api/presence", { method: "POST" }).catch(() => {});
+    ping();
+    const id = setInterval(ping, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const fetchUnread = useCallback(async () => {
     try {
-      const res = await fetch("/api/messages/unread-count");
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.count);
+      const countRes = await fetch("/api/messages/unread-count");
+      if (countRes.ok) {
+        const { count } = await countRes.json();
+        setUnreadCount(count);
       }
+
+      const senderRes = await fetch("/api/messages/unread-per-sender");
+      if (!senderRes.ok) return;
+      const senders: UnreadSender[] = await senderRes.json();
+
+      for (const s of senders) {
+        const prev = prevSendersRef.current.get(s.senderId) ?? 0;
+        if (s.count > prev) {
+          showToast("info", `💬 ${s.senderName}`, s.lastMessage, 7500);
+        }
+      }
+
+      const newMap = new Map<string, number>();
+      for (const s of senders) newMap.set(s.senderId, s.count);
+      prevSendersRef.current = newMap;
     } catch {
       // ignore
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 5000);
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 5000);
     return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
+  }, [fetchUnread]);
 
   if (status === "loading") {
     return (
@@ -173,7 +206,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Sidebar spacer */}
-      <div className="hidden lg:block lg:w-1/5 flex-shrink-0" />
+      <div className="hidden lg:block lg:w-1/5 shrink-0" />
 
       {/* Main content area */}
       <div className="flex-1 min-h-screen pt-14 lg:pt-0">{children}</div>

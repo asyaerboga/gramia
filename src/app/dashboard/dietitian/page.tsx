@@ -55,11 +55,20 @@ interface DietitianStats {
   }>;
 }
 
+interface PendingReviewApt {
+  _id: string;
+  date: string;
+  time: string;
+  status: string;
+  clientName: string;
+}
+
 export default function DietitianDashboardPage() {
   const { data: session } = useSession();
   const [stats, setStats] = useState<DietitianStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [clientNames, setClientNames] = useState<Record<string, string>>({});
+  const [pendingReview, setPendingReview] = useState<PendingReviewApt[]>([]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -91,10 +100,20 @@ export default function DietitianDashboardPage() {
     }
   }, []);
 
+  const fetchPendingReview = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dietitian/appointments?pendingReview=true");
+      if (res.ok) setPendingReview(await res.json());
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
     fetchClients();
-  }, [fetchStats, fetchClients]);
+    fetchPendingReview();
+  }, [fetchStats, fetchClients, fetchPendingReview]);
 
   if (loading) {
     return (
@@ -256,6 +275,62 @@ export default function DietitianDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Pending Review Reminder */}
+        {pendingReview.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+            <div className="flex items-start gap-3">
+              <FaExclamationCircle className="text-amber-500 text-xl mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h2 className="font-semibold text-amber-900">
+                    ⏰ Sonucu Belirsiz Randevular ({pendingReview.length})
+                  </h2>
+                  <Link
+                    href="/dashboard/dietitian/appointments"
+                    className="text-xs text-amber-700 hover:text-amber-900 underline whitespace-nowrap"
+                  >
+                    Randevulara Git
+                  </Link>
+                </div>
+                <p className="text-xs text-amber-700 mb-3">
+                  Aşağıdaki geçmiş randevular için &quot;Gerçekleşti&quot; veya &quot;Gerçekleşmedi&quot; durumunu giriniz.
+                </p>
+                <div className="space-y-2">
+                  {pendingReview.slice(0, 5).map((apt) => (
+                    <div
+                      key={apt._id}
+                      className="flex items-center justify-between bg-white rounded-lg px-4 py-2.5 border border-amber-100"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{apt.clientName}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(apt.date).toLocaleDateString("tr-TR", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}{" "}
+                          — {apt.time}
+                        </p>
+                      </div>
+                      <Link
+                        href="/dashboard/dietitian/appointments"
+                        className="text-xs px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition"
+                      >
+                        Güncelle
+                      </Link>
+                    </div>
+                  ))}
+                  {pendingReview.length > 5 && (
+                    <p className="text-xs text-amber-600 text-center">
+                      +{pendingReview.length - 5} daha var
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Two Column Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

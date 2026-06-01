@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 export interface IMessage extends Document {
   senderId: Types.ObjectId;
   receiverId: Types.ObjectId;
-  type: "text" | "image" | "audio";
+  type: "text" | "image" | "audio" | "document";
   content: string;
   timestamp: Date;
   status: "sent" | "delivered" | "read";
@@ -16,7 +16,7 @@ const MessageSchema = new Schema<IMessage>(
     receiverId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     type: {
       type: String,
-      enum: ["text", "image", "audio"],
+      enum: ["text", "image", "audio", "document"],
       default: "text",
     },
     content: { type: String, required: true },

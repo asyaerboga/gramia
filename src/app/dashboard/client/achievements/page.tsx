@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { FaTrophy, FaLock, FaStar, FaMedal } from "react-icons/fa";
+import { useToast } from "@/components/providers/ToastProvider";
 
 interface Achievement {
   id: string;
@@ -23,6 +24,7 @@ export default function AchievementsPage() {
   const [loading, setLoading] = useState(true);
   const [totalPoints, setTotalPoints] = useState(0);
   const [unlockedCount, setUnlockedCount] = useState(0);
+  const { success } = useToast();
 
   const fetchAchievements = useCallback(async () => {
     try {
@@ -40,9 +42,34 @@ export default function AchievementsPage() {
     }
   }, []);
 
+  // On mount: trigger a full achievement check, then refresh list.
+  // `success` is intentionally NOT in deps — it's never stable between renders
+  // and including it would cause infinite loops.
   useEffect(() => {
-    fetchAchievements();
-  }, [fetchAchievements]);
+    let cancelled = false;
+    const checkAndFetch = async () => {
+      try {
+        const res = await fetch("/api/achievements/check", { method: "POST" });
+        if (res.ok && !cancelled) {
+          const { newlyAwarded } = await res.json();
+          if (newlyAwarded && newlyAwarded.length > 0) {
+            for (const a of newlyAwarded) {
+              success(
+                `🏆 Yeni Rozet: ${a.name}`,
+                `${a.description} — +${a.points} puan`,
+              );
+            }
+          }
+        }
+      } catch {
+        // ignore check errors
+      }
+      if (!cancelled) await fetchAchievements();
+    };
+    checkAndFetch();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchAchievements]); // `success` deliberately excluded
 
   const categorizeAchievements = (): AchievementCategory[] => {
     const categories: { [key: string]: Achievement[] } = {

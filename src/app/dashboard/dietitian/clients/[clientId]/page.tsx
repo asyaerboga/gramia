@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import MannequinChart from "@/components/client/MannequinChart";
 import CalorieBar from "@/components/client/CalorieBar";
@@ -38,6 +38,22 @@ interface ClientProfile {
   chronicDiseases: string[];
   totalCalories: number;
   targetCalories: number;
+}
+
+interface BloodTestRecord {
+  _id: string;
+  imageUrl: string;
+  originalName: string;
+  notes?: string;
+  testDate: string;
+}
+
+interface SatietyRecord {
+  _id: string;
+  mealType: string;
+  satietyLevel: number;
+  date: string;
+  notes?: string;
 }
 
 interface MeasurementRecord {
@@ -120,12 +136,14 @@ interface ClientData {
   };
   meals?: {
     items: MealItem[];
+    satietyRecords?: SatietyRecord[];
     summary: {
       totalMeals: number;
       totalCalories: number;
       avgCaloriesPerDay: number;
       byType: Record<string, { count: number; calories: number }>;
       dailyCalories: Record<string, number>;
+      avgSatiety?: number;
     };
   };
   achievements?: {
@@ -179,6 +197,7 @@ export default function ClientProfilePage() {
   const [selectedRegion, setSelectedRegion] = useState<keyof Regions>("waist");
   const [showMeasurementForm, setShowMeasurementForm] = useState(false);
   const [showWeightModal, setShowWeightModal] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
   const [measurementForm, setMeasurementForm] = useState<Regions>({
     neck: 0,
     chest: 0,
@@ -189,6 +208,18 @@ export default function ClientProfilePage() {
     calf: 0,
   });
   const [weightForm, setWeightForm] = useState("");
+
+  // Health modal state
+  const [healthTab, setHealthTab] = useState<"diseases" | "blood">("diseases");
+  const [chronicDiseases, setChronicDiseases] = useState<string[]>([]);
+  const [bloodTests, setBloodTests] = useState<BloodTestRecord[]>([]);
+  const [newDisease, setNewDisease] = useState("");
+  const [bloodFile, setBloodFile] = useState<File | null>(null);
+  const [bloodNotes, setBloodNotes] = useState("");
+  const [bloodDate, setBloodDate] = useState(new Date().toISOString().split("T")[0]);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const fetchClient = useCallback(async () => {
     try {
@@ -236,6 +267,114 @@ export default function ClientProfilePage() {
   useEffect(() => {
     fetchClientData();
   }, [fetchClientData]);
+
+  // Poll wellness/meals data every 30s when those tabs are active
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    const POLLING_TABS: TabType[] = ["wellness", "meals", "exercises"];
+    if (POLLING_TABS.includes(activeTab)) {
+      pollingRef.current = setInterval(() => {
+        fetchClientData();
+      }, 30_000);
+    }
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [activeTab, fetchClientData]);
+
+  const fetchHealth = useCallback(async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch(`/api/dietitian/clients/${clientId}/health`);
+      if (res.ok) {
+        const data = await res.json();
+        setChronicDiseases(data.chronicDiseases || []);
+        setBloodTests(data.bloodTests || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch health:", error);
+    } finally {
+      setHealthLoading(false);
+    }
+  }, [clientId]);
+
+  const handleOpenHealthModal = () => {
+    setShowHealthModal(true);
+    fetchHealth();
+  };
+
+  const handleAddDisease = async () => {
+    if (!newDisease.trim()) return;
+    try {
+      const res = await fetch(`/api/dietitian/clients/${clientId}/health`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disease: newDisease.trim() }),
+      });
+      if (res.ok) {
+        setNewDisease("");
+        fetchHealth();
+        fetchClient();
+      }
+    } catch (error) {
+      console.error("Failed to add disease:", error);
+    }
+  };
+
+  const handleRemoveDisease = async (disease: string) => {
+    try {
+      await fetch(`/api/dietitian/clients/${clientId}/health`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "disease", disease }),
+      });
+      fetchHealth();
+      fetchClient();
+    } catch (error) {
+      console.error("Failed to remove disease:", error);
+    }
+  };
+
+  const handleUploadBloodTest = async () => {
+    if (!bloodFile) return;
+    setUploadLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", bloodFile);
+      fd.append("notes", bloodNotes);
+      fd.append("testDate", bloodDate);
+      const res = await fetch(`/api/dietitian/clients/${clientId}/health`, {
+        method: "POST",
+        body: fd,
+      });
+      if (res.ok) {
+        setBloodFile(null);
+        setBloodNotes("");
+        setBloodDate(new Date().toISOString().split("T")[0]);
+        fetchHealth();
+      }
+    } catch (error) {
+      console.error("Failed to upload blood test:", error);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const handleDeleteBloodTest = async (bloodTestId: string) => {
+    try {
+      await fetch(`/api/dietitian/clients/${clientId}/health`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "bloodTest", bloodTestId }),
+      });
+      fetchHealth();
+    } catch (error) {
+      console.error("Failed to delete blood test:", error);
+    }
+  };
 
   const handleAddMeasurement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,6 +488,12 @@ export default function ClientProfilePage() {
               <option value={14}>Son 14 gün</option>
               <option value={30}>Son 30 gün</option>
             </select>
+            <button
+              onClick={handleOpenHealthModal}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition"
+            >
+              🩸 Kan & Hastalıklar
+            </button>
             <button
               onClick={() => setShowWeightModal(true)}
               className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition"
@@ -710,7 +855,7 @@ export default function ClientProfilePage() {
         {activeTab === "meals" && (
           <div className="space-y-6">
             {/* Meals Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Toplam Öğün</p>
                 <p className="text-2xl font-bold text-emerald-600">
@@ -734,6 +879,15 @@ export default function ClientProfilePage() {
                 <p className="text-2xl font-bold text-gray-600">
                   {client.targetCalories}
                 </p>
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <p className="text-xs text-gray-500">Ort. Tokluk</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {clientData?.meals?.summary.avgSatiety
+                    ? ["😫","😕","😊","😄","🤩"][Math.round(clientData.meals.summary.avgSatiety) - 1] + " " + clientData.meals.summary.avgSatiety
+                    : "—"}
+                </p>
+                <p className="text-xs text-gray-400">/5</p>
               </div>
             </div>
 
@@ -785,6 +939,42 @@ export default function ClientProfilePage() {
                   </div>
                 </div>
               )}
+
+            {/* Satiety History */}
+            {clientData?.meals?.satietyRecords && clientData.meals.satietyRecords.length > 0 && (
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h3 className="font-semibold text-gray-900 mb-4">😋 Tokluk Geçmişi</h3>
+                <div className="space-y-2">
+                  {clientData.meals.satietyRecords.slice(0, 20).map((s) => {
+                    const emojis = ["😫","😕","😊","😄","🤩"];
+                    const labels = ["Çok Aç","Aç","Normal","Tok","Çok Tok"];
+                    const mealColors: Record<string,string> = {
+                      breakfast:"bg-amber-50 text-amber-700",
+                      lunch:"bg-blue-50 text-blue-700",
+                      dinner:"bg-purple-50 text-purple-700",
+                      snack:"bg-green-50 text-green-700",
+                    };
+                    return (
+                      <div key={s._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${mealColors[s.mealType] || "bg-gray-100 text-gray-600"}`}>
+                            {mealTypeLabels[s.mealType] || s.mealType}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {new Date(s.date).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{emojis[s.satietyLevel - 1]}</span>
+                          <span className="text-sm font-medium text-gray-700">{labels[s.satietyLevel - 1]}</span>
+                          <span className="text-xs text-gray-400">({s.satietyLevel}/5)</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Meal List */}
             <div className="bg-white rounded-xl p-6 shadow-sm">
@@ -945,6 +1135,215 @@ export default function ClientProfilePage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Health Modal */}
+        {showHealthModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                <h3 className="font-semibold text-gray-900">🩸 Kan Değerleri & Kronik Hastalıklar</h3>
+                <button
+                  onClick={() => setShowHealthModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex border-b border-gray-100 flex-shrink-0">
+                <button
+                  onClick={() => setHealthTab("diseases")}
+                  className={`flex-1 py-3 text-sm font-medium transition ${
+                    healthTab === "diseases"
+                      ? "text-red-600 border-b-2 border-red-500"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  🏥 Kronik Hastalıklar
+                </button>
+                <button
+                  onClick={() => setHealthTab("blood")}
+                  className={`flex-1 py-3 text-sm font-medium transition ${
+                    healthTab === "blood"
+                      ? "text-red-600 border-b-2 border-red-500"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  🔬 Kan Tahlili
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 p-6">
+                {healthLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500" />
+                  </div>
+                ) : healthTab === "diseases" ? (
+                  <div className="space-y-4">
+                    {/* Add disease */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newDisease}
+                        onChange={(e) => setNewDisease(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddDisease()}
+                        placeholder="Örn: Diyabet, Hipertansiyon..."
+                        className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                      <button
+                        onClick={handleAddDisease}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition"
+                      >
+                        Ekle
+                      </button>
+                    </div>
+
+                    {/* Disease list */}
+                    {chronicDiseases.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">
+                        Henüz kronik hastalık eklenmedi.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {chronicDiseases.map((d) => (
+                          <span
+                            key={d}
+                            className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-full text-sm flex items-center gap-2"
+                          >
+                            {d}
+                            <button
+                              onClick={() => handleRemoveDisease(d)}
+                              className="text-red-400 hover:text-red-700 font-bold leading-none"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {/* Upload form */}
+                    <div className="border border-dashed border-gray-300 rounded-xl p-4 space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Yeni Tahlil Yükle</p>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Görsel (JPG/PNG)</label>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(e) => setBloodFile(e.target.files?.[0] || null)}
+                          className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-red-50 file:text-red-600 hover:file:bg-red-100"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Tarih</label>
+                          <input
+                            type="date"
+                            value={bloodDate}
+                            onChange={(e) => setBloodDate(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Not (opsiyonel)</label>
+                          <input
+                            type="text"
+                            value={bloodNotes}
+                            onChange={(e) => setBloodNotes(e.target.value)}
+                            placeholder="Açıklama..."
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleUploadBloodTest}
+                        disabled={!bloodFile || uploadLoading}
+                        className="w-full py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
+                      >
+                        {uploadLoading ? "Yükleniyor..." : "Yükle"}
+                      </button>
+                    </div>
+
+                    {/* Existing blood tests */}
+                    {bloodTests.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">
+                        Henüz kan tahlili yüklenmedi.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {bloodTests.map((bt) => (
+                          <div
+                            key={bt._id}
+                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl"
+                          >
+                            <button
+                              onClick={() => setLightboxUrl(bt.imageUrl)}
+                              className="flex-shrink-0"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={bt.imageUrl}
+                                alt={bt.originalName}
+                                className="w-14 h-14 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition"
+                              />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {bt.originalName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(bt.testDate).toLocaleDateString("tr-TR", {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                })}
+                              </p>
+                              {bt.notes && (
+                                <p className="text-xs text-gray-400 truncate">{bt.notes}</p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleDeleteBloodTest(bt._id)}
+                              className="flex-shrink-0 text-gray-400 hover:text-red-500 transition text-lg leading-none"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lightbox */}
+        {lightboxUrl && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <div className="relative max-w-3xl max-h-[90vh] mx-4" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setLightboxUrl(null)}
+                className="absolute -top-10 right-0 text-white text-3xl leading-none hover:text-gray-300"
+              >
+                ✕
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxUrl}
+                alt="Kan tahlili"
+                className="max-w-full max-h-[85vh] rounded-xl object-contain"
+              />
             </div>
           </div>
         )}

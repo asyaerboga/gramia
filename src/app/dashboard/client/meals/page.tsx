@@ -6,6 +6,9 @@ import MealCard from "@/components/client/MealCard";
 interface MealItem {
   name: string;
   calories: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
 }
 
 interface MealsByType {
@@ -13,6 +16,11 @@ interface MealsByType {
   lunch: MealItem[];
   dinner: MealItem[];
   snack: MealItem[];
+}
+
+interface SatietyRecord {
+  mealType: string;
+  satietyLevel: number;
 }
 
 const mealLabels: Record<string, string> = {
@@ -32,6 +40,7 @@ export default function MealsPage() {
     dinner: [],
     snack: [],
   });
+  const [satiety, setSatiety] = useState<Record<string, number>>({});
 
   const fetchMeals = useCallback(async () => {
     try {
@@ -56,9 +65,26 @@ export default function MealsPage() {
     }
   }, [selectedDate]);
 
+  const fetchSatiety = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/meal-satiety?date=${selectedDate}`);
+      if (res.ok) {
+        const data: SatietyRecord[] = await res.json();
+        const map: Record<string, number> = {};
+        for (const r of data) {
+          map[r.mealType] = r.satietyLevel;
+        }
+        setSatiety(map);
+      }
+    } catch (error) {
+      console.error("Failed to fetch satiety:", error);
+    }
+  }, [selectedDate]);
+
   useEffect(() => {
     fetchMeals();
-  }, [fetchMeals]);
+    fetchSatiety();
+  }, [fetchMeals, fetchSatiety]);
 
   const handleAddItem = async (mealType: string, item: MealItem) => {
     try {
@@ -76,6 +102,25 @@ export default function MealsPage() {
       }
     } catch (error) {
       console.error("Failed to add meal:", error);
+    }
+  };
+
+  const handleSetSatiety = async (mealType: string, level: number) => {
+    // Optimistic update
+    setSatiety((prev) => ({ ...prev, [mealType]: level }));
+    try {
+      await fetch("/api/meal-satiety", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: selectedDate,
+          mealType,
+          satietyLevel: level,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to save satiety:", error);
+      fetchSatiety();
     }
   };
 
@@ -110,6 +155,8 @@ export default function MealsPage() {
                 mealLabel={mealLabels[mealType]}
                 items={meals[mealType]}
                 onAddItem={handleAddItem}
+                satietyLevel={satiety[mealType]}
+                onSetSatiety={handleSetSatiety}
               />
             ),
           )}
@@ -127,9 +174,9 @@ export default function MealsPage() {
         <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 mt-6">
           <h3 className="font-semibold text-emerald-700 mb-2">💡 İpuçları</h3>
           <p className="text-sm text-emerald-600">
-            Her öğün için yemek adı ve kalori değerini girerek günlük
-            beslenmenizi takip edin. Kalori barınız ana sayfada otomatik olarak
-            güncellenir.
+            Öğün ekledikten sonra tokluk durumunuzu işaretleyin. Bu bilgiler
+            diyetisyeninizle paylaşılarak diyet planınızın iyileştirilmesine
+            yardımcı olur.
           </p>
         </div>
       </div>
