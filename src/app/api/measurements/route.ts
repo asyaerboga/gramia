@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
     }
 
-    const { clientId, date, regions } = await request.json();
+    const { clientId, date, regions, weight, height } = await request.json();
 
     if (!clientId || !regions) {
       return NextResponse.json(
@@ -85,7 +85,18 @@ export async function POST(request: Request) {
       clientId,
       date: date || new Date(),
       regions,
+      ...(weight != null && { weight }),
+      ...(height != null && { height }),
     });
+
+    // Danışanın güncel ağırlığını güncelle
+    if (weight != null) {
+      const updateFields: Record<string, number> = { weight };
+      if (height != null) updateFields.height = height;
+      await Client.findByIdAndUpdate(clientId, { $set: updateFields });
+    } else if (height != null) {
+      await Client.findByIdAndUpdate(clientId, { $set: { height } });
+    }
 
     return NextResponse.json(measurement, { status: 201 });
   } catch (error) {

@@ -41,6 +41,7 @@ export default function AppointmentsPage() {
   const [showBooking, setShowBooking] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [booking, setBooking] = useState(false);
+  const [bookingError, setBookingError] = useState("");
   const [datesWithSlots, setDatesWithSlots] = useState<Set<string>>(new Set());
 
   /* ── Data fetching ─────────────────────────────── */
@@ -115,6 +116,7 @@ export default function AppointmentsPage() {
   const handleBook = async () => {
     if (!selectedDate || !selectedTime) return;
     setBooking(true);
+    setBookingError("");
     try {
       const res = await fetch("/api/appointments", {
         method: "POST",
@@ -128,6 +130,13 @@ export default function AppointmentsPage() {
         setSelectedDate("");
         setSelectedTime("");
         setAvailableSlots([]);
+      } else {
+        const data = await res.json();
+        setBookingError(data.error || "Randevu alınamadı, lütfen tekrar deneyin.");
+        if (res.status === 409) {
+          await fetchSlotsForDate(selectedDate);
+          setSelectedTime("");
+        }
       }
     } finally { setBooking(false); }
   };
@@ -257,7 +266,7 @@ export default function AppointmentsPage() {
                 {new Date(selectedDate).toLocaleDateString("tr-TR", { day:"numeric", month:"long", year:"numeric" })}
               </h3>
               <button
-                onClick={() => { setShowBooking(false); setSelectedDate(""); setAvailableSlots([]); }}
+                onClick={() => { setShowBooking(false); setSelectedDate(""); setAvailableSlots([]); setBookingError(""); }}
                 className="text-gray-400 hover:text-gray-600 text-lg leading-none"
               >
                 ✕
@@ -290,6 +299,11 @@ export default function AppointmentsPage() {
                     </button>
                   ))}
                 </div>
+                {bookingError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {bookingError}
+                  </p>
+                )}
                 <button
                   onClick={handleBook}
                   disabled={!selectedTime || booking}

@@ -6,9 +6,31 @@
 }
 
 body {
-  background: #ffffff;
+  background: linear-gradient(145deg, #f0fdf4 0%, #f8fafc 55%, #f0fdfe 100%);
+  background-attachment: fixed;
   color: #171717;
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Vibrant button gradient */
+.btn-primary {
+  background: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+  color: white;
+  transition: opacity 0.2s, transform 0.15s;
+}
+.btn-primary:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* Vivid card */
+.card-vivid {
+  border: 1px solid rgba(16, 185, 129, 0.12);
+  box-shadow: 0 4px 20px -4px rgba(16, 185, 129, 0.15), 0 1px 4px rgba(0,0,0,0.05);
+}
+.card-vivid:hover {
+  box-shadow: 0 8px 30px -6px rgba(16, 185, 129, 0.25), 0 2px 8px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
 }
 
 /* Toast Animation */
@@ -100,4 +122,75 @@ body {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+/* ─── Modern Select ─────────────────────────── */
+.select-modern {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgba(255, 255, 255, 0.85);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2310b981'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 1rem;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(16, 185, 129, 0.22);
+  border-radius: 0.75rem;
+  padding: 0.5rem 2.25rem 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.select-modern:hover {
+  border-color: rgba(16, 185, 129, 0.45);
+  background-color: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+.select-modern:focus {
+  outline: none;
+  border-color: #10b981;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), 0 2px 8px rgba(16, 185, 129, 0.08);
+}
+.select-modern option {
+  color: #374151;
+  background: #fff;
+}
+
+/* ─── Modern Date Input ─────────────────────── */
+.date-modern {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(16, 185, 129, 0.22);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.date-modern:hover {
+  border-color: rgba(16, 185, 129, 0.45);
+  background-color: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+.date-modern:focus {
+  outline: none;
+  border-color: #10b981;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), 0 2px 8px rgba(16, 185, 129, 0.08);
+}
+.date-modern::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  filter: invert(56%) sepia(70%) saturate(500%) hue-rotate(120deg) brightness(90%) contrast(95%);
+  transition: opacity 0.15s;
+}
+.date-modern::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }

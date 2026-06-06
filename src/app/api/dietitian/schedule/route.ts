@@ -4,6 +4,13 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import WeeklySchedule from "@/lib/models/WeeklySchedule";
 
+const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
+  dayOfWeek: dow,
+  enabled: dow >= 1 && dow <= 5,
+  startTime: "09:00",
+  endTime: "17:00",
+}));
+
 // GET /api/dietitian/schedule
 export async function GET() {
   try {
@@ -14,21 +21,19 @@ export async function GET() {
 
     await dbConnect();
 
-    const schedule = await WeeklySchedule.findOne({ dietitianId: session.user.id });
-
-    if (!schedule) {
-      // Return a default empty schedule
-      return NextResponse.json({
-        days: [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
-          dayOfWeek: dow,
-          enabled: dow >= 1 && dow <= 5, // Mon-Fri default enabled
-          startTime: "09:00",
-          endTime: "17:00",
-        })),
-        slotDuration: 30,
-        excludePublicHolidays: true,
-      });
-    }
+    // Auto-create default schedule if none exists so clients see availability immediately
+    const schedule = await WeeklySchedule.findOneAndUpdate(
+      { dietitianId: session.user.id },
+      {
+        $setOnInsert: {
+          dietitianId: session.user.id,
+          days: DEFAULT_DAYS,
+          slotDuration: 30,
+          excludePublicHolidays: true,
+        },
+      },
+      { upsert: true, new: true },
+    );
 
     return NextResponse.json(schedule);
   } catch (error) {

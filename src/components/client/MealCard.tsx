@@ -177,6 +177,54 @@ const satietyOptions = [
   { level: 5, emoji: "🤩", label: "Çok Tok" },
 ];
 
+// Full Tailwind class strings per meal type — must be literal for Tailwind to include them
+const mealThemes = {
+  breakfast: {
+    borderLeft: "border-l-4 border-l-amber-400",
+    addBtn: "text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200",
+    calText: "text-amber-600",
+    satietySelected: "border-amber-500 bg-amber-50",
+    satietySelectedText: "text-amber-700 font-semibold",
+    savedText: "text-amber-600",
+    kcalBadge: "bg-amber-50 text-amber-700",
+    submitBtn: "bg-amber-500 hover:bg-amber-600 text-white",
+    ring: "focus:ring-amber-400",
+  },
+  lunch: {
+    borderLeft: "border-l-4 border-l-emerald-400",
+    addBtn: "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200",
+    calText: "text-emerald-600",
+    satietySelected: "border-emerald-500 bg-emerald-50",
+    satietySelectedText: "text-emerald-700 font-semibold",
+    savedText: "text-emerald-600",
+    kcalBadge: "bg-emerald-50 text-emerald-700",
+    submitBtn: "bg-emerald-500 hover:bg-emerald-600 text-white",
+    ring: "focus:ring-emerald-400",
+  },
+  dinner: {
+    borderLeft: "border-l-4 border-l-indigo-400",
+    addBtn: "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200",
+    calText: "text-indigo-600",
+    satietySelected: "border-indigo-500 bg-indigo-50",
+    satietySelectedText: "text-indigo-700 font-semibold",
+    savedText: "text-indigo-600",
+    kcalBadge: "bg-indigo-50 text-indigo-700",
+    submitBtn: "bg-indigo-500 hover:bg-indigo-600 text-white",
+    ring: "focus:ring-indigo-400",
+  },
+  snack: {
+    borderLeft: "border-l-4 border-l-rose-400",
+    addBtn: "text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200",
+    calText: "text-rose-600",
+    satietySelected: "border-rose-500 bg-rose-50",
+    satietySelectedText: "text-rose-700 font-semibold",
+    savedText: "text-rose-600",
+    kcalBadge: "bg-rose-50 text-rose-700",
+    submitBtn: "bg-rose-500 hover:bg-rose-600 text-white",
+    ring: "focus:ring-rose-400",
+  },
+};
+
 export default function MealCard({
   mealType,
   mealLabel,
@@ -194,6 +242,8 @@ export default function MealCard({
   const [fat, setFat] = useState("");
   const [activeCategory, setActiveCategory] = useState(ALL_KEY);
   const [search, setSearch] = useState("");
+
+  const theme = mealThemes[mealType as keyof typeof mealThemes] ?? mealThemes.lunch;
 
   const total = items.reduce((sum, item) => sum + item.calories, 0);
   const totalProtein = items.reduce((sum, item) => sum + (item.protein || 0), 0);
@@ -249,127 +299,149 @@ export default function MealCard({
 
   return (
     <>
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-gray-900">{mealLabel}</h4>
+      {/* Card */}
+      <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 ${theme.borderLeft} overflow-hidden hover:shadow-md transition-shadow`}>
+        {/* Card header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+          <h4 className="font-bold text-gray-900 text-base">{mealLabel}</h4>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1 text-emerald-500 hover:text-emerald-600 text-sm font-medium bg-emerald-50 px-3 py-1 rounded-lg transition"
+            className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-xl transition-colors ${theme.addBtn}`}
           >
-            <FaPlus className="text-xs" /> Ekle
+            <FaPlus className="text-xs" />
+            Ekle
           </button>
         </div>
 
-        {items.length > 0 ? (
-          <>
-            <ul className="space-y-2 mb-3">
-              {items.map((item, i) => (
-                <li
-                  key={i}
-                  className="flex justify-between items-center text-sm bg-gray-50 rounded-lg px-3 py-2"
-                >
-                  <div>
-                    <span className="text-gray-900">{item.name}</span>
-                    {(item.protein || item.carbs || item.fat) && (
-                      <div className="flex gap-2 mt-0.5 text-[10px] text-gray-400">
-                        {item.protein ? <span>P: {item.protein}g</span> : null}
-                        {item.carbs ? <span>K: {item.carbs}g</span> : null}
-                        {item.fat ? <span>Y: {item.fat}g</span> : null}
-                      </div>
-                    )}
-                  </div>
-                  <span className="font-medium text-emerald-600 flex items-center gap-1">
-                    <FaFire className="text-orange-400 text-xs" />
-                    {item.calories}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="border-t pt-3 space-y-1 mb-4">
-              <div className="flex justify-between text-sm font-bold text-gray-900">
-                <span>Toplam</span>
-                <span className="text-emerald-600">{total} kcal</span>
-              </div>
-              {(totalProtein > 0 || totalCarbs > 0 || totalFat > 0) && (
-                <div className="flex justify-end gap-3 text-xs text-gray-500">
-                  <span className="text-red-500">P: {totalProtein}g</span>
-                  <span className="text-amber-500">K: {totalCarbs}g</span>
-                  <span className="text-blue-500">Y: {totalFat}g</span>
-                </div>
-              )}
-            </div>
-
-            {/* Satiety check-in */}
-            <div className="border-t pt-3">
-              <p className="text-xs text-gray-500 mb-2">Tokluk Durumu</p>
-              <div className="flex gap-1.5">
-                {satietyOptions.map((opt) => (
-                  <button
-                    key={opt.level}
-                    type="button"
-                    onClick={() => onSetSatiety(mealType, opt.level)}
-                    title={opt.label}
-                    className={`flex-1 flex flex-col items-center py-1.5 rounded-lg border-2 transition text-xs gap-0.5 ${
-                      satietyLevel === opt.level
-                        ? "border-emerald-500 bg-emerald-50"
-                        : "border-gray-100 hover:border-emerald-300 bg-gray-50"
-                    }`}
-                  >
-                    <span className="text-lg leading-none">{opt.emoji}</span>
-                    <span className={`hidden sm:block leading-none ${satietyLevel === opt.level ? "text-emerald-700 font-medium" : "text-gray-400"}`}>
-                      {opt.label}
+        <div className="p-5">
+          {items.length > 0 ? (
+            <>
+              {/* Food items */}
+              <ul className="space-y-2 mb-4">
+                {items.map((item, i) => (
+                  <li key={i} className="flex items-start justify-between gap-2 py-2 border-b border-gray-50 last:border-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                      {(item.protein || item.carbs || item.fat) && (
+                        <div className="flex gap-2 mt-0.5">
+                          {item.protein ? <span className="text-[10px] text-rose-400 font-medium">P {item.protein}g</span> : null}
+                          {item.carbs ? <span className="text-[10px] text-amber-400 font-medium">K {item.carbs}g</span> : null}
+                          {item.fat ? <span className="text-[10px] text-sky-400 font-medium">Y {item.fat}g</span> : null}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`shrink-0 flex items-center gap-1 text-sm font-bold ${theme.calText}`}>
+                      <FaFire className="text-orange-400 text-xs" />
+                      {item.calories}
                     </span>
-                  </button>
+                  </li>
                 ))}
+              </ul>
+
+              {/* Totals */}
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-xl mb-4">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Toplam</span>
+                <div className="flex items-center gap-4">
+                  {(totalProtein > 0 || totalCarbs > 0 || totalFat > 0) && (
+                    <div className="flex gap-2.5 text-[10px] font-medium">
+                      <span className="text-rose-400">P {totalProtein}g</span>
+                      <span className="text-amber-400">K {totalCarbs}g</span>
+                      <span className="text-sky-400">Y {totalFat}g</span>
+                    </div>
+                  )}
+                  <span className={`text-sm font-black ${theme.calText}`}>{total} kcal</span>
+                </div>
               </div>
-              {satietyLevel && (
-                <p className="text-xs text-center text-emerald-600 mt-1.5">
-                  {satietyOptions.find((o) => o.level === satietyLevel)?.emoji}{" "}
-                  {satietyOptions.find((o) => o.level === satietyLevel)?.label} kaydedildi
-                </p>
-              )}
+
+              {/* Satiety */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Tokluk Durumu</p>
+                <div className="flex gap-1.5">
+                  {satietyOptions.map((opt) => (
+                    <button
+                      key={opt.level}
+                      type="button"
+                      onClick={() => onSetSatiety(mealType, opt.level)}
+                      title={opt.label}
+                      className={`flex-1 flex flex-col items-center py-2 rounded-xl border-2 transition-all text-xs gap-1 ${
+                        satietyLevel === opt.level
+                          ? theme.satietySelected
+                          : "border-gray-100 hover:border-gray-200 bg-gray-50"
+                      }`}
+                    >
+                      <span className="text-base leading-none">{opt.emoji}</span>
+                      <span className={`hidden sm:block text-[9px] leading-none truncate w-full text-center px-0.5 ${
+                        satietyLevel === opt.level ? theme.satietySelectedText : "text-gray-400"
+                      }`}>
+                        {opt.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {satietyLevel && (
+                  <p className={`text-[11px] text-center mt-2 font-medium ${theme.savedText}`}>
+                    {satietyOptions.find((o) => o.level === satietyLevel)?.emoji}{" "}
+                    {satietyOptions.find((o) => o.level === satietyLevel)?.label} kaydedildi
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <p className="text-3xl mb-2 opacity-30">🍽️</p>
+              <p className="text-sm text-gray-400">Henüz yemek eklenmedi</p>
+              <p className="text-xs text-gray-300 mt-0.5">Yukarıdaki Ekle butonuna tıklayın</p>
             </div>
-          </>
-        ) : (
-          <p className="text-sm text-gray-400 text-center py-4">Henüz yemek eklenmedi</p>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden max-h-[92vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-              <h3 className="font-semibold text-gray-900">{mealLabel} — Yemek Ekle</h3>
-              <button onClick={resetForm} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[92vh] flex flex-col">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+              <div>
+                <h3 className="font-bold text-gray-900">{mealLabel}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Yemek ekle</p>
+              </div>
+              <button
+                onClick={resetForm}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors text-sm font-bold"
+              >
+                ✕
+              </button>
             </div>
 
-            {/* Quick Foods Section */}
-            <div className="flex-shrink-0 bg-gray-50 border-b border-gray-100">
-              <div className="px-4 pt-3 pb-2">
-                <p className="text-xs font-medium text-gray-500 mb-2">⚡ Hızlı Seçim</p>
+            {/* Quick food section */}
+            <div className="shrink-0 border-b border-gray-100">
+              <div className="px-5 pt-4 pb-3">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">⚡ Hızlı Seçim</p>
+
                 {/* Search */}
-                <div className="relative mb-2">
+                <div className="relative mb-3">
                   <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Yemek ara..."
-                    className="w-full pl-8 pr-4 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className={`w-full pl-8 pr-4 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 ${theme.ring} text-gray-900`}
                   />
                 </div>
+
                 {/* Category tabs */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
                   {[ALL_KEY, ...CATEGORY_KEYS].map((cat) => (
                     <button
                       key={cat}
                       onClick={() => { setActiveCategory(cat); setSearch(""); }}
-                      className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition whitespace-nowrap ${
+                      className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
                         activeCategory === cat
-                          ? "bg-emerald-500 text-white"
-                          : "bg-white text-gray-600 border border-gray-200 hover:border-emerald-300"
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                       }`}
                     >
                       {cat}
@@ -379,21 +451,27 @@ export default function MealCard({
               </div>
 
               {/* Food list */}
-              <div className="px-4 pb-3 max-h-44 overflow-y-auto">
+              <div className="max-h-48 overflow-y-auto px-5 pb-3">
                 {displayedFoods.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-2 text-center">Sonuç bulunamadı</p>
+                  <p className="text-sm text-gray-400 py-3 text-center">Sonuç bulunamadı</p>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="space-y-0.5">
                     {displayedFoods.map((food) => (
                       <button
                         key={food.name}
                         type="button"
                         onClick={() => selectQuickFood(food)}
-                        className="px-2.5 py-1 bg-white text-xs text-gray-700 rounded-lg border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition text-left"
-                        title={`${food.calories} kcal | P:${food.protein}g K:${food.carbs}g Y:${food.fat}g`}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-gray-50 text-left transition-colors group"
                       >
-                        {food.name.split(" (")[0]}
-                        <span className="text-gray-400 ml-1">{food.calories}k</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-gray-800 group-hover:text-gray-900 truncate">{food.name}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            P {food.protein}g · K {food.carbs}g · Y {food.fat}g
+                          </p>
+                        </div>
+                        <span className={`shrink-0 ml-3 text-xs font-bold px-2.5 py-1 rounded-lg ${theme.kcalBadge}`}>
+                          {food.calories} kcal
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -402,21 +480,22 @@ export default function MealCard({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Yemek Adı</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Örn: Tavuk göğsü"
+                  required
+                  className={`w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 ${theme.ring} text-gray-900`}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Yemek Adı</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Örn: Tavuk göğsü"
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                  />
-                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Kalori (kcal)</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Kalori (kcal)</label>
                   <input
                     type="number"
                     value={calories}
@@ -424,14 +503,14 @@ export default function MealCard({
                     placeholder="250"
                     required
                     min="1"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    className={`w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 ${theme.ring} text-gray-900`}
                   />
                 </div>
                 <div className="flex items-end">
                   <button
                     type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="w-full py-2.5 text-sm text-emerald-600 hover:text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition"
+                    className="w-full py-2.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-medium"
                   >
                     {showAdvanced ? "− Makro Gizle" : "+ Makro Ekle"}
                   </button>
@@ -439,31 +518,44 @@ export default function MealCard({
               </div>
 
               {showAdvanced && (
-                <div className="grid grid-cols-3 gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Protein (g)</label>
-                    <input type="number" value={protein} onChange={(e) => setProtein(e.target.value)} placeholder="0" min="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 text-gray-900" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Karb (g)</label>
-                    <input type="number" value={carbs} onChange={(e) => setCarbs(e.target.value)} placeholder="0" min="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 text-gray-900" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Yağ (g)</label>
-                    <input type="number" value={fat} onChange={(e) => setFat(e.target.value)} placeholder="0" min="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-900" />
-                  </div>
+                <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl">
+                  {[
+                    { label: "Protein (g)", val: protein, set: setProtein, ring: "focus:ring-rose-400" },
+                    { label: "Karb (g)", val: carbs, set: setCarbs, ring: "focus:ring-amber-400" },
+                    { label: "Yağ (g)", val: fat, set: setFat, ring: "focus:ring-sky-400" },
+                  ].map(({ label, val, set, ring }) => (
+                    <div key={label}>
+                      <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">{label}</label>
+                      <input
+                        type="number"
+                        value={val}
+                        onChange={(e) => set(e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        className={`w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 ${ring} text-gray-900 bg-white`}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
 
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={resetForm} className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
+                >
                   İptal
                 </button>
-                <button type="submit" className="flex-1 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition">
+                <button
+                  type="submit"
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${theme.submitBtn}`}
+                >
                   Kaydet
                 </button>
               </div>
             </form>
+
           </div>
         </div>
       )}

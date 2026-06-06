@@ -11,10 +11,30 @@ export default function GoalProgressBar({
   currentWeight,
   targetWeight,
 }: GoalProgressBarProps) {
-  const totalToLose = startWeight - targetWeight;
-  const lost = startWeight - currentWeight;
-  const percentage = totalToLose > 0 ? Math.min((lost / totalToLose) * 100, 100) : 0;
-  const remaining = currentWeight - targetWeight;
+  const totalChange = startWeight - targetWeight;
+  const change = startWeight - currentWeight;
+  const percentage =
+    totalChange !== 0
+      ? Math.min(Math.max((change / totalChange) * 100, 0), 100)
+      : 0;
+  const remaining = Math.max(0, currentWeight - targetWeight);
+  const isCompleted = totalChange > 0 && currentWeight <= targetWeight;
+
+  if (isCompleted) {
+    return (
+      <div className="bg-linear-to-br from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-200 text-center">
+        <div className="text-5xl mb-3">🏆</div>
+        <h4 className="text-lg font-bold text-emerald-700 mb-1">Hedefe Ulaştın!</h4>
+        <p className="text-sm text-emerald-600 mb-4">
+          {startWeight} kg → {currentWeight} kg — {(startWeight - currentWeight).toFixed(1)} kg verdin
+        </p>
+        <div className="w-full bg-emerald-100 rounded-full h-4 relative overflow-hidden">
+          <div className="bg-linear-to-r from-emerald-400 to-teal-500 h-4 rounded-full w-full" />
+        </div>
+        <p className="text-xs text-emerald-500 mt-2 font-medium">%100 Tamamlandı 🎉</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm">
@@ -27,7 +47,7 @@ export default function GoalProgressBar({
       </div>
       <div className="w-full bg-gray-100 rounded-full h-5 mb-2 relative">
         <div
-          className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-5 rounded-full transition-all duration-500"
+          className="bg-linear-to-r from-emerald-400 to-emerald-600 h-5 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
         <div
@@ -40,7 +60,7 @@ export default function GoalProgressBar({
           Güncel: <span className="font-bold">{currentWeight}kg</span>
         </p>
         <p className="text-sm text-gray-500">
-          Kalan: <span className="font-semibold text-emerald-600">{remaining > 0 ? remaining : 0}kg</span>
+          Kalan: <span className="font-semibold text-emerald-600">{remaining > 0 ? remaining.toFixed(1) : 0}kg</span>
         </p>
       </div>
     </div>

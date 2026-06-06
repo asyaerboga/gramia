@@ -55,6 +55,12 @@ export async function GET() {
       date: { $gte: weekStart },
     });
 
+    // Bugün ölçüm yapan danışanlar
+    const todayMeasurements = weekMeasurements.filter((m) => {
+      const d = new Date(m.date);
+      return d >= today && d < tomorrow;
+    });
+
     // Yaklaşan randevular (bugün ve sonrası)
     const upcomingAppointments = await Appointment.find({
       dietitianId: session.user.id,
@@ -84,6 +90,42 @@ export async function GET() {
       date: { $gte: monthStart, $lte: monthEnd },
     });
 
+    // Her danışanın en güncel ağırlığını ölçümlerden al
+    const measurementsWithWeight = await Measurement.find({
+      clientId: { $in: clientIds },
+      weight: { $exists: true, $ne: null },
+    }).sort({ date: -1 });
+
+    const latestWeightMap = new Map<string, number>();
+    for (const m of measurementsWithWeight) {
+      const key = m.clientId.toString();
+      if (!latestWeightMap.has(key)) {
+        latestWeightMap.set(key, m.weight as number);
+      }
+    }
+
+    // Hedef yönünü belirle ve ilerleme hesapla (kilo verme veya alma)
+    const calcProgress = (startW: number, currentW: number, targetW: number): number => {
+      if (startW === targetW) return 0;
+      if (startW > targetW) {
+        // Kilo verme hedefi
+        const totalToLose = startW - targetW;
+        const lost = startW - currentW;
+        return Math.min(100, Math.max(0, Math.round((lost / totalToLose) * 100)));
+      } else {
+        // Kilo alma hedefi
+        const totalToGain = targetW - startW;
+        const gained = currentW - startW;
+        return Math.min(100, Math.max(0, Math.round((gained / totalToGain) * 100)));
+      }
+    };
+
+    const hasReachedGoal = (startW: number, currentW: number, targetW: number): boolean => {
+      if (startW > targetW) return currentW <= targetW;
+      if (startW < targetW) return currentW >= targetW;
+      return false;
+    };
+
     // En aktif danışanlar (bu hafta en çok kayıt giren)
     const clientActivity = await Promise.all(
       clients.map(async (client) => {
@@ -99,50 +141,89 @@ export async function GET() {
           name: string;
           email: string;
         };
+        const currentWeight =
+          latestWeightMap.get(client._id.toString()) ?? client.weight;
+        const startW = client.startWeight ?? client.weight;
         return {
           clientId: client._id,
           name: user?.name || "İsimsiz",
           activityScore: mealCount + exerciseCount,
-          weight: client.weight,
+          weight: currentWeight,
           targetWeight: client.targetWeight,
-          progress:
-            client.startWeight > client.targetWeight
-              ? Math.round(
-                  ((client.startWeight - client.weight) /
-                    (client.startWeight - client.targetWeight)) *
-                    100,
-                )
-              : 0,
+          progress: calcProgress(startW, currentWeight, client.targetWeight),
         };
       }),
     );
 
-    // Hedefine ulaşan danışanlar
-    const goalReached = clients.filter(
-      (c) => c.weight <= c.targetWeight,
-    ).length;
+    // Hedefine ulaşan danışanlar (kilo verme veya alma hedefi olan ve hedefe ulaşmış)
+    const goalReached = clients.filter((c) => {
+      const currentWeight =
+        latestWeightMap.get(c._id.toString()) ?? c.weight;
+      const startW = c.startWeight ?? c.weight;
+      return hasReachedGoal(startW, currentWeight, c.targetWeight);
+    }).length;
 
     // İlerleme raporları
     const clientsWithProgress = clients
       .map((c) => {
         const user = c.userId as unknown as { name: string };
-        const totalToLose = c.startWeight - c.targetWeight;
-        const lost = c.startWeight - c.weight;
-        const progress =
-          totalToLose > 0
-            ? Math.min(100, Math.round((lost / totalToLose) * 100))
-            : 0;
+        const currentWeight =
+          latestWeightMap.get(c._id.toString()) ?? c.weight;
+        const startW = c.startWeight ?? c.weight;
+        const progress = calcProgress(startW, currentWeight, c.targetWeight);
         return {
           id: c._id,
           name: user?.name || "İsimsiz",
-          startWeight: c.startWeight,
-          currentWeight: c.weight,
+          startWeight: startW,
+          currentWeight,
           targetWeight: c.targetWeight,
           progress,
-          lostKg: Math.round(lost * 10) / 10,
+          lostKg: Math.round(Math.abs(startW - currentWeight) * 10) / 10,
         };
       })
       .sort((a, b) => b.progress - a.progress);
+
+    // Bugün öğün kaydeden, egzersiz kaydeden, ölçüm yapan danışan listeleri
+    const clientMap = new Map(
+      clients.map((c) => {
+        const user = c.userId as unknown as { name: string };
+        return [c._id.toString(), user?.name || "İsimsiz"];
+      }),
+    );
+
+    const uniqueClientNames = (ids: string[]) =>
+      [...new Set(ids)].map((id) => ({ id, name: clientMap.get(id) || "İsimsiz" }));
+
+    const mealClients = uniqueClientNames(todayMeals.map((m) => m.clientId.toString()));
+    const exerciseClients = uniqueClientNames(todayExercises.map((e) => e.clientId.toString()));
+    const measurementClients = uniqueClientNames(todayMeasurements.map((m) => m.clientId.toString()));
+
+    // Hedefe ulaşan danışanların tam listesi (modal için)
+    const goalReachedClients = clients
+      .filter((c) => {
+        const currentWeight =
+          latestWeightMap.get(c._id.toString()) ?? c.weight;
+        const startW = c.startWeight ?? c.weight;
+        return hasReachedGoal(startW, currentWeight, c.targetWeight);
+      })
+      .map((c) => {
+        const user = c.userId as unknown as { name: string };
+        const currentWeight =
+          latestWeightMap.get(c._id.toString()) ?? c.weight;
+        const startW = c.startWeight ?? c.weight;
+        const changedKg = Math.round(Math.abs(startW - currentWeight) * 10) / 10;
+        return {
+          id: c._id,
+          name: user?.name || "İsimsiz",
+          startWeight: startW,
+          currentWeight,
+          targetWeight: c.targetWeight,
+          progress: 100,
+          lostKg: changedKg,
+          direction: startW > c.targetWeight ? "loss" : "gain",
+        };
+      })
+      .sort((a, b) => b.lostKg - a.lostKg);
 
     return NextResponse.json({
       overview: {
@@ -159,10 +240,10 @@ export async function GET() {
       todayStats: {
         mealsLogged: todayMeals.length,
         exercisesLogged: todayExercises.length,
-        measurementsTaken: weekMeasurements.filter((m) => {
-          const d = new Date(m.date);
-          return d >= today && d < tomorrow;
-        }).length,
+        measurementsTaken: todayMeasurements.length,
+        mealClients,
+        exerciseClients,
+        measurementClients,
       },
       upcomingAppointments: upcomingAppointments.map((a) => ({
         _id: a._id,
@@ -175,6 +256,7 @@ export async function GET() {
         .sort((a, b) => b.activityScore - a.activityScore)
         .slice(0, 5),
       clientProgress: clientsWithProgress.slice(0, 5),
+      goalReachedClients,
       weekMeasurements: weekMeasurements.length,
     });
   } catch (error) {

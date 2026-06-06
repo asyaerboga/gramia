@@ -12,6 +12,17 @@ import {
   toDateKey,
 } from "@/lib/slotUtils";
 
+const FALLBACK_SCHEDULE = {
+  days: [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
+    dayOfWeek: dow,
+    enabled: dow >= 1 && dow <= 5,
+    startTime: "09:00",
+    endTime: "17:00",
+  })),
+  slotDuration: 30,
+  excludePublicHolidays: true,
+};
+
 // GET /api/slots?date=YYYY-MM-DD
 // Returns available (unbooked, unblocked) time slots for the client's dietitian
 export async function GET(request: NextRequest) {
@@ -67,22 +78,30 @@ export async function GET(request: NextRequest) {
     const dow = targetDate.getDay();
     let scheduleTimes: string[] = [];
 
-    if (schedule) {
-      const isHoliday = schedule.excludePublicHolidays && isTurkishFixedHoliday(targetDate);
-      if (!isHoliday) {
-        const dayConf = schedule.days.find((d) => d.dayOfWeek === dow);
-        if (dayConf?.enabled) {
-          scheduleTimes = generateTimeSlots(dayConf.startTime, dayConf.endTime, schedule.slotDuration);
-        }
+    const activeSchedule = schedule ?? FALLBACK_SCHEDULE;
+    const isHoliday = activeSchedule.excludePublicHolidays && isTurkishFixedHoliday(targetDate);
+    if (!isHoliday) {
+      const dayConf = activeSchedule.days.find((d) => d.dayOfWeek === dow);
+      if (dayConf?.enabled) {
+        scheduleTimes = generateTimeSlots(dayConf.startTime, dayConf.endTime, activeSchedule.slotDuration);
       }
     }
 
     // Combined = schedule + extras - blocked - booked
     const allTimes = new Set([...scheduleTimes, ...extraTimes]);
+    const now = new Date();
+    const isToday = toDateKey(now) === dateKey;
+    // For today, only return slots that haven't started yet (with a 5-minute buffer)
+    const nowMinutes = isToday ? now.getHours() * 60 + now.getMinutes() + 5 : 0;
     const available: string[] = [];
     for (const time of [...allTimes].sort()) {
       if (!blockedTimes.has(time) && !bookedTimes.has(time)) {
-        available.push(time);
+        if (isToday) {
+          const [h, m] = time.split(":").map(Number);
+          if (h * 60 + m >= nowMinutes) available.push(time);
+        } else {
+          available.push(time);
+        }
       }
     }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import MealCard from "@/components/client/MealCard";
 
 interface MealItem {
@@ -30,10 +31,31 @@ const mealLabels: Record<string, string> = {
   snack: "🍎 Atıştırmalık",
 };
 
+function addDays(dateStr: string, days: number) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  return getLocalDateStr(d);
+}
+
+function formatDateLabel(dateStr: string) {
+  const date = new Date(dateStr + "T12:00:00");
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
+  if (diff === 0) return "Bugün";
+  if (diff === -1) return "Dün";
+  if (diff === 1) return "Yarın";
+  return date.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
+}
+
+function getLocalDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function MealsPage() {
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const router = useRouter();
+  const todayStr = getLocalDateStr();
+  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [meals, setMeals] = useState<MealsByType>({
     breakfast: [],
     lunch: [],
@@ -47,12 +69,7 @@ export default function MealsPage() {
       const res = await fetch(`/api/meals?date=${selectedDate}`);
       if (res.ok) {
         const data = await res.json();
-        const grouped: MealsByType = {
-          breakfast: [],
-          lunch: [],
-          dinner: [],
-          snack: [],
-        };
+        const grouped: MealsByType = { breakfast: [], lunch: [], dinner: [], snack: [] };
         for (const meal of data) {
           if (grouped[meal.mealType as keyof MealsByType]) {
             grouped[meal.mealType as keyof MealsByType].push(...meal.items);
@@ -71,9 +88,7 @@ export default function MealsPage() {
       if (res.ok) {
         const data: SatietyRecord[] = await res.json();
         const map: Record<string, number> = {};
-        for (const r of data) {
-          map[r.mealType] = r.satietyLevel;
-        }
+        for (const r of data) map[r.mealType] = r.satietyLevel;
         setSatiety(map);
       }
     } catch (error) {
@@ -91,14 +106,11 @@ export default function MealsPage() {
       const res = await fetch("/api/meals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: selectedDate,
-          mealType,
-          items: [item],
-        }),
+        body: JSON.stringify({ date: selectedDate, mealType, items: [item] }),
       });
       if (res.ok) {
         fetchMeals();
+        router.refresh();
       }
     } catch (error) {
       console.error("Failed to add meal:", error);
@@ -106,17 +118,12 @@ export default function MealsPage() {
   };
 
   const handleSetSatiety = async (mealType: string, level: number) => {
-    // Optimistic update
     setSatiety((prev) => ({ ...prev, [mealType]: level }));
     try {
       await fetch("/api/meal-satiety", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: selectedDate,
-          mealType,
-          satietyLevel: level,
-        }),
+        body: JSON.stringify({ date: selectedDate, mealType, satietyLevel: level }),
       });
     } catch (error) {
       console.error("Failed to save satiety:", error);
@@ -124,61 +131,123 @@ export default function MealsPage() {
     }
   };
 
-  const totalCalories = Object.values(meals)
-    .flat()
-    .reduce((sum, item) => sum + item.calories, 0);
+  const allItems = Object.values(meals).flat();
+  const totalCalories = allItems.reduce((sum, i) => sum + i.calories, 0);
+  const totalProtein = allItems.reduce((sum, i) => sum + (i.protein || 0), 0);
+  const totalCarbs = allItems.reduce((sum, i) => sum + (i.carbs || 0), 0);
+  const totalFat = allItems.reduce((sum, i) => sum + (i.fat || 0), 0);
+  const macroCalories = totalProtein * 4 + totalCarbs * 4 + totalFat * 9;
+  const isToday = selectedDate === todayStr;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">
-          🍽️ Yemek Ekleme
-        </h2>
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-emerald-50/40 p-4 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-5">
 
-        {/* Date picker */}
-        <div className="mb-6">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-gray-900"
-          />
+        {/* Page header */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Yemek Günlüğü</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Öğünlerinizi takip edin</p>
         </div>
 
-        {/* Meal cards grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {(Object.keys(mealLabels) as (keyof MealsByType)[]).map(
-            (mealType) => (
-              <MealCard
-                key={mealType}
-                mealType={mealType}
-                mealLabel={mealLabels[mealType]}
-                items={meals[mealType]}
-                onAddItem={handleAddItem}
-                satietyLevel={satiety[mealType]}
-                onSetSatiety={handleSetSatiety}
-              />
-            ),
+        {/* Date navigation */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSelectedDate(addDays(selectedDate, -1))}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors shadow-sm text-xl leading-none"
+          >
+            ‹
+          </button>
+
+          <div className="flex-1 flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
+            <span className="font-semibold text-gray-900 text-sm md:text-base">
+              {formatDateLabel(selectedDate)}
+            </span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="text-xs text-gray-400 cursor-pointer focus:outline-none bg-transparent"
+            />
+          </div>
+
+          <button
+            onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors shadow-sm text-xl leading-none"
+          >
+            ›
+          </button>
+
+          {!isToday && (
+            <button
+              onClick={() => setSelectedDate(todayStr)}
+              className="hidden sm:flex items-center px-3 h-10 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors whitespace-nowrap"
+            >
+              Bugün
+            </button>
           )}
         </div>
 
-        {/* Daily total */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mt-6 text-center">
-          <p className="text-gray-500 text-sm">Günlük Toplam</p>
-          <p className="text-3xl font-bold text-emerald-600">
-            {totalCalories} kcal
-          </p>
+        {/* Daily summary */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Günlük Toplam</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-4xl font-black text-gray-900">{totalCalories}</span>
+                <span className="text-sm text-gray-400 font-medium">kcal</span>
+              </div>
+            </div>
+            <div className="flex gap-5">
+              <div className="text-center">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Protein</p>
+                <p className="text-lg font-bold text-rose-500">{totalProtein}<span className="text-xs font-normal">g</span></p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Karb</p>
+                <p className="text-lg font-bold text-amber-500">{totalCarbs}<span className="text-xs font-normal">g</span></p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Yağ</p>
+                <p className="text-lg font-bold text-sky-500">{totalFat}<span className="text-xs font-normal">g</span></p>
+              </div>
+            </div>
+          </div>
+
+          {macroCalories > 0 ? (
+            <div className="flex rounded-full h-2.5 overflow-hidden bg-gray-100">
+              <div
+                className="bg-rose-400 transition-all duration-500"
+                style={{ width: `${(totalProtein * 4 / macroCalories) * 100}%` }}
+              />
+              <div
+                className="bg-amber-400 transition-all duration-500"
+                style={{ width: `${(totalCarbs * 4 / macroCalories) * 100}%` }}
+              />
+              <div
+                className="bg-sky-400 transition-all duration-500"
+                style={{ width: `${(totalFat * 9 / macroCalories) * 100}%` }}
+              />
+            </div>
+          ) : (
+            <div className="h-2.5 rounded-full bg-gray-100" />
+          )}
         </div>
 
-        {/* Tips */}
-        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 mt-6">
-          <h3 className="font-semibold text-emerald-700 mb-2">💡 İpuçları</h3>
-          <p className="text-sm text-emerald-600">
-            Öğün ekledikten sonra tokluk durumunuzu işaretleyin. Bu bilgiler
-            diyetisyeninizle paylaşılarak diyet planınızın iyileştirilmesine
-            yardımcı olur.
-          </p>
+        {/* Meal cards grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(Object.keys(mealLabels) as (keyof MealsByType)[]).map((mealType) => (
+            <MealCard
+              key={mealType}
+              mealType={mealType}
+              mealLabel={mealLabels[mealType]}
+              items={meals[mealType]}
+              onAddItem={handleAddItem}
+              satietyLevel={satiety[mealType]}
+              onSetSatiety={handleSetSatiety}
+            />
+          ))}
         </div>
+
       </div>
     </div>
   );

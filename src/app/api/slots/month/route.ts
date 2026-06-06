@@ -13,6 +13,17 @@ import {
   toDateKey,
 } from "@/lib/slotUtils";
 
+const FALLBACK_SCHEDULE = {
+  days: [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
+    dayOfWeek: dow,
+    enabled: dow >= 1 && dow <= 5,
+    startTime: "09:00",
+    endTime: "17:00",
+  })),
+  slotDuration: 30,
+  excludePublicHolidays: true,
+};
+
 // GET /api/slots/month?from=YYYY-MM-DD&to=YYYY-MM-DD
 // Returns dates that have at least one available slot
 export async function GET(request: NextRequest) {
@@ -77,18 +88,22 @@ export async function GET(request: NextRequest) {
 
     const days = eachDayOfInterval({ start: startDate, end: endDate });
     const availableDates: string[] = [];
+    const activeSchedule = schedule ?? FALLBACK_SCHEDULE;
+    const now = new Date();
+    const todayKey = toDateKey(now);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes() + 5;
 
     for (const day of days) {
       const key = toDateKey(day);
       const dow = day.getDay();
       let scheduleTimes: string[] = [];
 
-      if (schedule) {
-        const isHoliday = schedule.excludePublicHolidays && isTurkishFixedHoliday(day);
+      {
+        const isHoliday = activeSchedule.excludePublicHolidays && isTurkishFixedHoliday(day);
         if (!isHoliday) {
-          const dayConf = schedule.days.find((d) => d.dayOfWeek === dow);
+          const dayConf = activeSchedule.days.find((d) => d.dayOfWeek === dow);
           if (dayConf?.enabled) {
-            scheduleTimes = generateTimeSlots(dayConf.startTime, dayConf.endTime, schedule.slotDuration);
+            scheduleTimes = generateTimeSlots(dayConf.startTime, dayConf.endTime, activeSchedule.slotDuration);
           }
         }
       }
@@ -96,11 +111,17 @@ export async function GET(request: NextRequest) {
       const extras = extrasMap.get(key) ?? new Set<string>();
       const blocked = blockedMap.get(key) ?? new Set<string>();
       const booked = bookedMap.get(key) ?? new Set<string>();
+      const isToday = key === todayKey;
 
       const allTimes = new Set([...scheduleTimes, ...extras]);
-      const hasAvailable = [...allTimes].some(
-        (t) => !blocked.has(t) && !booked.has(t),
-      );
+      const hasAvailable = [...allTimes].some((t) => {
+        if (blocked.has(t) || booked.has(t)) return false;
+        if (isToday) {
+          const [h, m] = t.split(":").map(Number);
+          return h * 60 + m >= nowMinutes;
+        }
+        return true;
+      });
 
       if (hasAvailable) {
         availableDates.push(key);

@@ -2,9 +2,11 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 export interface IMessage extends Document {
   senderId: Types.ObjectId;
-  receiverId: Types.ObjectId;
+  receiverId?: Types.ObjectId;
+  conversationId?: Types.ObjectId;
   type: "text" | "image" | "audio" | "document";
   content: string;
+  filename?: string;
   timestamp: Date;
   status: "sent" | "delivered" | "read";
   createdAt: Date;
@@ -13,13 +15,15 @@ export interface IMessage extends Document {
 const MessageSchema = new Schema<IMessage>(
   {
     senderId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    receiverId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    receiverId: { type: Schema.Types.ObjectId, ref: "User", required: false },
+    conversationId: { type: Schema.Types.ObjectId, ref: "Conversation", required: false },
     type: {
       type: String,
       enum: ["text", "image", "audio", "document"],
       default: "text",
     },
     content: { type: String, required: true },
+    filename: { type: String },
     timestamp: { type: Date, default: Date.now },
     status: {
       type: String,

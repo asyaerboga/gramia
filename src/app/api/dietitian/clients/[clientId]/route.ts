@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Client from "@/lib/models/Client";
 import Meal from "@/lib/models/Meal";
+import Measurement from "@/lib/models/Measurement";
+import mongoose from "mongoose";
 
 // GET /api/dietitian/clients/[clientId] - Get client profile
 export async function GET(
@@ -22,7 +24,7 @@ export async function GET(
     const client = await Client.findOne({
       _id: clientId,
       dietitianId: session.user.id,
-    }).populate("userId", "name email");
+    }).populate("userId", "name email image");
 
     if (!client) {
       return NextResponse.json(
@@ -37,21 +39,23 @@ export async function GET(
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const meals = await Meal.find({
-      clientId: client._id,
-      date: { $gte: today, $lt: tomorrow },
-    });
+    const [meals, latestMeasurement] = await Promise.all([
+      Meal.find({ clientId: client._id, date: { $gte: today, $lt: tomorrow } }),
+      Measurement.findOne({ clientId: client._id, weight: { $exists: true, $ne: null } }).sort({ date: -1 }),
+    ]);
     const totalCalories = meals.reduce((sum, m) => sum + m.totalCalories, 0);
+    const currentWeight = latestMeasurement?.weight ?? client.weight;
 
-    const user = client.userId as unknown as { name: string };
+    const user = client.userId as unknown as { name: string; image?: string };
 
     return NextResponse.json({
       _id: client._id,
       name: user?.name || "İsimsiz",
+      avatarUrl: user?.image || null,
       age: client.age,
       height: client.height,
-      weight: client.weight,
-      startWeight: client.startWeight,
+      weight: currentWeight,
+      startWeight: client.startWeight ?? client.weight,
       targetWeight: client.targetWeight,
       chronicDiseases: client.chronicDiseases,
       totalCalories,
@@ -96,6 +100,33 @@ export async function PATCH(
       return NextResponse.json(
         { error: "Danışan bulunamadı" },
         { status: 404 }
+      );
+    }
+
+    // Kilo güncellendiğinde en güncel ağırlık olarak Measurement kaydı oluştur
+    // Böylece daily-summary ve stats API'leri yeni kiloyu doğru gösterir
+    if (weight) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      await Measurement.findOneAndUpdate(
+        {
+          clientId: new mongoose.Types.ObjectId(clientId),
+          date: { $gte: today, $lt: tomorrow },
+        },
+        {
+          $set: {
+            clientId: new mongoose.Types.ObjectId(clientId),
+            date: new Date(),
+            weight,
+          },
+          $setOnInsert: {
+            regions: { neck: 0, chest: 0, waist: 0, hip: 0, arm: 0, thigh: 0, calf: 0 },
+          },
+        },
+        { upsert: true }
       );
     }
 

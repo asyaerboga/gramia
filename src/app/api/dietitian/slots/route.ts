@@ -12,6 +12,17 @@ import {
   toDateKey,
 } from "@/lib/slotUtils";
 
+const FALLBACK_SCHEDULE = {
+  days: [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
+    dayOfWeek: dow,
+    enabled: dow >= 1 && dow <= 5,
+    startTime: "09:00",
+    endTime: "17:00",
+  })),
+  slotDuration: 30,
+  excludePublicHolidays: true,
+};
+
 // Build combined slots for a single date given the schedule + overrides
 function buildSlotsForDate(
   date: Date,
@@ -25,17 +36,16 @@ function buildSlotsForDate(
   booked: Set<string>,    // "HH:MM" times already booked
 ): { time: string; source: "schedule" | "extra"; isBooked: boolean; isBlocked: boolean }[] {
   const dow = date.getDay(); // 0=Sunday
+  const activeSchedule = schedule ?? FALLBACK_SCHEDULE;
 
   // Generate schedule slots
   let scheduleTimes: string[] = [];
-  if (schedule) {
-    if (schedule.excludePublicHolidays && isTurkishFixedHoliday(date)) {
-      scheduleTimes = [];
-    } else {
-      const dayConf = schedule.days.find((d) => d.dayOfWeek === dow);
-      if (dayConf?.enabled) {
-        scheduleTimes = generateTimeSlots(dayConf.startTime, dayConf.endTime, schedule.slotDuration);
-      }
+  if (activeSchedule.excludePublicHolidays && isTurkishFixedHoliday(date)) {
+    scheduleTimes = [];
+  } else {
+    const dayConf = activeSchedule.days.find((d) => d.dayOfWeek === dow);
+    if (dayConf?.enabled) {
+      scheduleTimes = generateTimeSlots(dayConf.startTime, dayConf.endTime, activeSchedule.slotDuration);
     }
   }
 

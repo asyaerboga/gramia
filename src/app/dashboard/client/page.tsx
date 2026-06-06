@@ -72,6 +72,7 @@ interface ClientSummary {
 
 export default function ClientDashboard() {
   const { data: session } = useSession();
+  const [avatarImage, setAvatarImage] = useState<string | null>(null);
   const [summary, setSummary] = useState<ClientSummary>({
     totalCalories: 0,
     targetCalories: 1800,
@@ -98,7 +99,7 @@ export default function ClientDashboard() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch("/api/client/daily-summary");
+      const res = await fetch("/api/client/daily-summary", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setSummary(data);
@@ -112,6 +113,21 @@ export default function ClientDashboard() {
 
   useEffect(() => {
     fetchSummary();
+    fetch("/api/user/avatar")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d?.image && setAvatarImage(d.image))
+      .catch(() => {});
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchSummary();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const poll = setInterval(fetchSummary, 30_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(poll);
+    };
   }, [fetchSummary]);
 
   const handleWaterUpdate = async (amount: number) => {
@@ -194,34 +210,48 @@ export default function ClientDashboard() {
   const totalExerciseCalories = summary.todayExercise?.totalCaloriesBurned || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-emerald-50/50 to-teal-50/30">
       <div className="flex flex-col lg:flex-row">
         {/* Main content */}
         <div className="flex-1 p-4 md:p-6">
           {/* Header with Streak */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                Hoş Geldin, {session?.user?.name?.split(" ")[0] || "Danışan"} 👋
-              </h2>
-              <p className="text-gray-500 text-sm mt-1">
-                {new Date().toLocaleDateString("tr-TR", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
-              </p>
+            <div className="flex items-center gap-3">
+              {avatarImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarImage}
+                  alt="Profil"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-emerald-200 shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-lg border-2 border-emerald-200 shrink-0">
+                  {session?.user?.name?.charAt(0) || "D"}
+                </div>
+              )}
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                  Hoş Geldin, {session?.user?.name?.split(" ")[0] || "Danışan"} 👋
+                </h2>
+                <p className="text-gray-500 text-sm mt-1">
+                  {new Date().toLocaleDateString("tr-TR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
               {/* Streak Badge */}
-              <div className="bg-gradient-to-r from-orange-400 to-red-500 text-white px-3 md:px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-orange-200">
-                <FaFire className="text-yellow-200" />
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 md:px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-orange-300/50">
+                <FaFire className="text-yellow-300" />
                 <span className="font-bold">{summary.loginStreak}</span>
                 <span className="text-xs md:text-sm opacity-90">gün seri</span>
               </div>
               {/* Points Badge */}
-              <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 md:px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-purple-200">
-                <FaTrophy className="text-yellow-200" />
+              <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-3 md:px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-violet-300/50">
+                <FaTrophy className="text-yellow-300" />
                 <span className="font-bold">{summary.totalPoints}</span>
                 <span className="text-xs md:text-sm opacity-90">puan</span>
               </div>
@@ -230,67 +260,63 @@ export default function ClientDashboard() {
 
           {/* Quick Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 card-hover">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <FaFire className="text-orange-500" />
+            {/* Kalori */}
+            <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-4 shadow-lg shadow-orange-200/40 card-hover">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                  <FaFire className="text-white text-sm" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Kalori</p>
-                  <p className="font-bold text-gray-900">
+                <div className="min-w-0">
+                  <p className="text-xs text-orange-100">Kalori</p>
+                  <p className="font-bold text-white leading-tight">
                     {summary.totalCalories}
-                    <span className="text-gray-400 font-normal text-sm">
+                    <span className="text-orange-200 font-normal text-xs">
                       /{summary.targetCalories}
                     </span>
                   </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 card-hover">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <FaDumbbell className="text-purple-500" />
+            {/* Egzersiz */}
+            <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl p-4 shadow-lg shadow-violet-200/40 card-hover">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                  <FaDumbbell className="text-white text-sm" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Egzersiz</p>
-                  <p className="font-bold text-gray-900">
+                <div className="min-w-0">
+                  <p className="text-xs text-violet-100">Egzersiz</p>
+                  <p className="font-bold text-white leading-tight">
                     {totalExerciseCalories}
-                    <span className="text-gray-400 font-normal text-sm">
-                      {" "}
-                      kcal
-                    </span>
+                    <span className="text-violet-200 font-normal text-xs"> kcal</span>
                   </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 card-hover">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <FaMoon className="text-indigo-500" />
+            {/* Uyku */}
+            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl p-4 shadow-lg shadow-indigo-200/40 card-hover">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                  <FaMoon className="text-white text-sm" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Uyku</p>
-                  <p className="font-bold text-gray-900">
+                <div className="min-w-0">
+                  <p className="text-xs text-indigo-100">Uyku</p>
+                  <p className="font-bold text-white leading-tight">
                     {summary.todaySleep?.duration || "-"}
-                    <span className="text-gray-400 font-normal text-sm">
-                      {" "}
-                      saat
-                    </span>
+                    <span className="text-indigo-200 font-normal text-xs"> saat</span>
                   </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 card-hover">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <FaSmile className="text-yellow-500" />
+            {/* Ruh Hali */}
+            <div className="bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl p-4 shadow-lg shadow-amber-200/40 card-hover">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                  <FaSmile className="text-white text-sm" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Ruh Hali</p>
-                  <p className="font-bold text-gray-900 text-xl">
-                    {summary.todayCheckIn
-                      ? getMoodEmoji(summary.todayCheckIn.mood)
-                      : "-"}
+                <div className="min-w-0">
+                  <p className="text-xs text-amber-100">Ruh Hali</p>
+                  <p className="font-bold text-white text-xl leading-tight">
+                    {summary.todayCheckIn ? getMoodEmoji(summary.todayCheckIn.mood) : "-"}
                   </p>
                 </div>
               </div>
@@ -308,6 +334,7 @@ export default function ClientDashboard() {
                 <CalorieBar
                   current={summary.totalCalories}
                   target={summary.targetCalories}
+                  burned={totalExerciseCalories}
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -416,7 +443,7 @@ export default function ClientDashboard() {
 
           {/* Recent Achievements */}
           {summary.recentAchievements?.length > 0 && (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-100">
+            <div className="bg-linear-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-100">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                   🏆 Son Kazanılan Rozetler
@@ -432,7 +459,7 @@ export default function ClientDashboard() {
                 {summary.recentAchievements.map((achievement) => (
                   <div
                     key={achievement.achievementId}
-                    className="flex-shrink-0 bg-white rounded-xl p-4 text-center shadow-sm min-w-[120px]"
+                    className="shrink-0 bg-white rounded-xl p-4 text-center shadow-sm min-w-30"
                   >
                     <span className="text-3xl block mb-2">
                       {achievement.icon}

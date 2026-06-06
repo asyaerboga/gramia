@@ -18,6 +18,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get("clientId");
+    const date = searchParams.get("date");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
@@ -45,7 +46,13 @@ export async function GET(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = { clientId: targetClientId };
 
-    if (startDate || endDate) {
+    if (date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      const nextDay = new Date(d);
+      nextDay.setDate(nextDay.getDate() + 1);
+      query.date = { $gte: d, $lt: nextDay };
+    } else if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
@@ -90,9 +97,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const exerciseDate = date ? new Date(date) : new Date();
+    exerciseDate.setHours(12, 0, 0, 0);
+
     const exercise = await Exercise.create({
       clientId: client._id,
-      date: date ? new Date(date) : new Date(),
+      date: exerciseDate,
       type,
       name,
       duration,

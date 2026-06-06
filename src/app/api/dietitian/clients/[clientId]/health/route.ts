@@ -78,16 +78,17 @@ export async function POST(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Dosya bulunamadı" }, { status: 400 });
       }
 
-      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-      if (!allowedTypes.includes(file.type)) {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg", "application/pdf"];
+      const allowedExts = ["jpg", "jpeg", "png", "webp", "pdf"];
+      if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
         return NextResponse.json(
-          { error: "Sadece JPG, PNG veya WEBP formatı desteklenmektedir" },
+          { error: "Sadece JPG, PNG, WEBP veya PDF formatı desteklenmektedir" },
           { status: 400 },
         );
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const uploadDir = path.join(process.cwd(), "public", "uploads", "blood-tests", clientId);
       fs.mkdirSync(uploadDir, { recursive: true });

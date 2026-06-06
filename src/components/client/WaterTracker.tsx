@@ -38,7 +38,7 @@ export default function WaterTracker({
       <p className="text-lg font-bold text-gray-900 mb-3">
         {current}L <span className="text-gray-400 font-normal">/ {target}L</span>
       </p>
-      <div className="flex gap-2">
+      <div className="flex gap-6">
         <input
           type="number"
           step="0.1"
@@ -46,11 +46,11 @@ export default function WaterTracker({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Litre"
-          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-900"
+          className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-900"
         />
         <button
           onClick={handleAdd}
-          className="px-4 py-2 bg-blue-400 text-white rounded-lg text-sm hover:bg-blue-500 transition"
+          className="px-4 py-2 bg-blue-400 text-white rounded-lg text-sm hover:bg-blue-500 transition shrink-0"
         >
           Ekle
         </button>

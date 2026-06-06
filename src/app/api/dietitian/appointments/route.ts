@@ -102,6 +102,33 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Randevu bulunamadı" }, { status: 404 });
     }
 
+    const newDate = date ? new Date(date) : appointment.date;
+    const newTime = time || appointment.time;
+    const dateChanged = date && newDate.toISOString() !== appointment.date.toISOString();
+    const timeChanged = time && time !== appointment.time;
+
+    if (dateChanged || timeChanged) {
+      const startOfDay = new Date(newDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(newDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      const conflict = await Appointment.findOne({
+        _id: { $ne: appointmentId },
+        dietitianId: session.user.id,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        time: newTime,
+        status: { $ne: "cancelled" },
+      });
+
+      if (conflict) {
+        return NextResponse.json(
+          { error: "Bu tarih ve saatte başka bir randevu zaten mevcut" },
+          { status: 409 }
+        );
+      }
+    }
+
     if (status) appointment.status = status;
     if (date) appointment.date = new Date(date);
     if (time) appointment.time = time;

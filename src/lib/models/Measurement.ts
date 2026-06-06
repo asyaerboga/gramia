@@ -3,6 +3,8 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 export interface IMeasurement extends Document {
   clientId: Types.ObjectId;
   date: Date;
+  weight?: number;
+  height?: number;
   regions: {
     neck: number;
     chest: number;
@@ -19,6 +21,8 @@ const MeasurementSchema = new Schema<IMeasurement>(
   {
     clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true },
     date: { type: Date, required: true },
+    weight: { type: Number },
+    height: { type: Number },
     regions: {
       neck: { type: Number, default: 0 },
       chest: { type: Number, default: 0 },

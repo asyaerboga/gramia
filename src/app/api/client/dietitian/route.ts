@@ -37,6 +37,7 @@ export async function GET() {
       _id: dietitian._id,
       name: dietitian.name,
       email: dietitian.email,
+      image: dietitian.image || null,
     });
   } catch (error) {
     console.error("Fetch dietitian error:", error);

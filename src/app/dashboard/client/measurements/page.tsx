@@ -25,6 +25,8 @@ interface Regions {
 interface MeasurementRecord {
   _id: string;
   date: string;
+  weight?: number;
+  height?: number;
   regions: Regions;
 }
 
@@ -38,9 +40,18 @@ const regionLabels: Record<keyof Regions, string> = {
   calf: "Baldır",
 };
 
+type ChartKey = keyof Regions | "weight" | "height";
+
+const extraLabels: Record<"weight" | "height", string> = {
+  weight: "Kilo",
+  height: "Boy",
+};
+
 export default function MeasurementsPage() {
   const [measurements, setMeasurements] = useState<MeasurementRecord[]>([]);
-  const [selectedRegion, setSelectedRegion] = useState<keyof Regions>("waist");
+  const [selectedRegion, setSelectedRegion] = useState<ChartKey>("waist");
+  const [profileWeight, setProfileWeight] = useState<number | null>(null);
+  const [profileHeight, setProfileHeight] = useState<number | null>(null);
 
   const fetchMeasurements = useCallback(async () => {
     try {
@@ -54,11 +65,41 @@ export default function MeasurementsPage() {
     }
   }, []);
 
+  const fetchProfile = useCallback(async () => {
+    try {
+      const res = await fetch("/api/client/daily-summary");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.currentWeight) setProfileWeight(data.currentWeight);
+        if (data.currentHeight) setProfileHeight(data.currentHeight);
+      }
+    } catch (error) {
+      console.error("Failed to fetch profile:", error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchMeasurements();
-  }, [fetchMeasurements]);
+    fetchProfile();
+  }, [fetchMeasurements, fetchProfile]);
 
   const latestMeasurement = measurements[measurements.length - 1];
+
+  // Find the most recent measurement that has a non-null weight/height
+  const latestWeight = (() => {
+    for (let i = measurements.length - 1; i >= 0; i--) {
+      if (measurements[i].weight != null) return measurements[i].weight;
+    }
+    return profileWeight;
+  })();
+
+  const latestHeight = (() => {
+    for (let i = measurements.length - 1; i >= 0; i--) {
+      if (measurements[i].height != null) return measurements[i].height;
+    }
+    return profileHeight;
+  })();
+
   const regions = latestMeasurement?.regions || {
     neck: 0,
     chest: 0,
@@ -74,7 +115,12 @@ export default function MeasurementsPage() {
       day: "numeric",
       month: "short",
     }),
-    value: m.regions[selectedRegion],
+    value:
+      selectedRegion === "weight"
+        ? (m.weight ?? null)
+        : selectedRegion === "height"
+          ? (m.height ?? null)
+          : m.regions[selectedRegion as keyof Regions],
   }));
 
   return (
@@ -91,6 +137,34 @@ export default function MeasurementsPage() {
           </div>
         </div>
 
+        {/* Weight & Height summary */}
+        {(latestWeight != null || latestHeight != null) && (
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl">
+                ⚖️
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Son Kilo</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {latestWeight != null ? `${latestWeight} kg` : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-xl">
+                📏
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Boy</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {latestHeight != null ? `${latestHeight} cm` : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Mannequin Chart */}
         <MannequinChart regions={regions} />
 
@@ -102,16 +176,23 @@ export default function MeasurementsPage() {
             </label>
             <select
               value={selectedRegion}
-              onChange={(e) =>
-                setSelectedRegion(e.target.value as keyof Regions)
-              }
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+              onChange={(e) => setSelectedRegion(e.target.value as ChartKey)}
+              className="select-modern"
             >
-              {Object.entries(regionLabels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
+              <optgroup label="Kilo & Boy">
+                {Object.entries(extraLabels).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Vücut Bölgeleri">
+                {Object.entries(regionLabels).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
 
@@ -147,6 +228,8 @@ export default function MeasurementsPage() {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left py-2 text-gray-500">Tarih</th>
+                    <th className="text-center py-2 text-gray-500">Kilo</th>
+                    <th className="text-center py-2 text-gray-500">Boy</th>
                     {Object.values(regionLabels).map((label) => (
                       <th
                         key={label}
@@ -162,6 +245,12 @@ export default function MeasurementsPage() {
                     <tr key={m._id} className="border-b border-gray-50">
                       <td className="py-2 text-gray-700">
                         {new Date(m.date).toLocaleDateString("tr-TR")}
+                      </td>
+                      <td className="text-center py-2 text-blue-600 font-medium">
+                        {m.weight != null ? `${m.weight}kg` : "—"}
+                      </td>
+                      <td className="text-center py-2 text-emerald-600 font-medium">
+                        {m.height != null ? `${m.height}cm` : "—"}
                       </td>
                       {(Object.keys(regionLabels) as (keyof Regions)[]).map(
                         (key) => (

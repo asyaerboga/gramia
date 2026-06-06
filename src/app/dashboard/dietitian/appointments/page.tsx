@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   format,
   startOfMonth,
@@ -92,11 +93,17 @@ const DEFAULT_SCHEDULE: WeeklyScheduleData = {
 
 /* ─── Component ──────────────────────────────────────── */
 export default function DietitianAppointmentsPage() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const searchParams = useSearchParams();
+  const initialDate = searchParams.get("date");
+  const initialAptId = searchParams.get("appointmentId");
+  const parsedInitial = initialDate ? new Date(initialDate) : new Date();
+
+  const [currentMonth, setCurrentMonth] = useState(parsedInitial);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [monthSlots, setMonthSlots] = useState<DaySlots[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [selectedDaySlots, setSelectedDaySlots] = useState<{ date: Date; slots: SlotEntry[] } | null>(null);
+  const pendingAutoSelectRef = useRef(initialAptId);
 
   // Weekly schedule modal
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -151,6 +158,17 @@ export default function DietitianAppointmentsPage() {
 
   useEffect(() => { fetchAppointments(); fetchSchedule(); }, [fetchAppointments, fetchSchedule]);
   useEffect(() => { fetchMonthSlots(); }, [fetchMonthSlots]);
+
+  // Auto-open the appointment passed via ?appointmentId= once appointments are loaded
+  useEffect(() => {
+    const id = pendingAutoSelectRef.current;
+    if (!id || appointments.length === 0) return;
+    const apt = appointments.find((a) => a._id === id);
+    if (!apt) return;
+    setSelectedAppointment(apt);
+    setSelectedDaySlots(null);
+    pendingAutoSelectRef.current = null;
+  }, [appointments]);
 
   /* ─── Calendar helpers ───────────────────────────── */
   const monthStart = startOfMonth(currentMonth);
@@ -598,7 +616,7 @@ export default function DietitianAppointmentsPage() {
                           <select
                             value={dayConf.startTime}
                             onChange={(e) => updateDay(dow, { startTime: e.target.value })}
-                            className="flex-1 px-2 py-1.5 border border-indigo-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            className="select-modern flex-1"
                           >
                             {ALL_TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
                           </select>
@@ -606,7 +624,7 @@ export default function DietitianAppointmentsPage() {
                           <select
                             value={dayConf.endTime}
                             onChange={(e) => updateDay(dow, { endTime: e.target.value })}
-                            className="flex-1 px-2 py-1.5 border border-indigo-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            className="select-modern flex-1"
                           >
                             {ALL_TIME_SLOTS.filter((t) => t > dayConf.startTime).map((t) => <option key={t} value={t}>{t}</option>)}
                           </select>
@@ -669,13 +687,13 @@ export default function DietitianAppointmentsPage() {
                 <div>
                   <label className="text-sm text-gray-600 block mb-1">Başlangıç</label>
                   <input type="date" value={overrideStartDate} onChange={(e) => setOverrideStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    className="date-modern w-full" />
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1">Bitiş</label>
                   <input type="date" value={overrideEndDate} onChange={(e) => setOverrideEndDate(e.target.value)}
                     min={overrideStartDate}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    className="date-modern w-full" />
                 </div>
               </div>
 
@@ -725,7 +743,7 @@ export default function DietitianAppointmentsPage() {
               <div>
                 <label className="text-sm text-gray-600 block mb-1">Tarih</label>
                 <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  className="date-modern w-full" />
               </div>
               <div>
                 <label className="text-sm text-gray-600 block mb-2">Saat</label>

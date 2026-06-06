@@ -34,11 +34,13 @@ export async function POST(request: Request) {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Update existing or create new
     const existing = await WaterIntake.findOne({
       clientId: client._id,
-      date: { $gte: today },
+      date: { $gte: today, $lt: tomorrow },
     });
 
     if (existing) {

@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+
+function getLocalDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
   FaMoon,
@@ -58,9 +63,8 @@ const commonSymptoms = [
 ];
 
 export default function WellnessPage() {
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const router = useRouter();
+  const [selectedDate, setSelectedDate] = useState(getLocalDateStr);
   const [sleep, setSleep] = useState<Sleep | null>(null);
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null);
   const [loading, setLoading] = useState(true);
@@ -210,6 +214,7 @@ export default function WellnessPage() {
         success("Uyku Kaydedildi", "Uyku bilgileriniz güncellendi.");
         fetchData();
         fetchWeeklySleep();
+        router.refresh();
       } else {
         error("Hata", "Uyku kaydedilirken bir hata oluştu.");
       }
@@ -233,6 +238,7 @@ export default function WellnessPage() {
       if (res.ok) {
         success("Check-in Tamamlandı", "Günlük check-in kaydedildi.");
         fetchData();
+        router.refresh();
       } else {
         error("Hata", "Check-in kaydedilirken bir hata oluştu.");
       }
@@ -251,7 +257,7 @@ export default function WellnessPage() {
     }));
   };
 
-  const isToday = selectedDate === new Date().toISOString().split("T")[0];
+  const isToday = selectedDate === getLocalDateStr();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
@@ -271,8 +277,8 @@ export default function WellnessPage() {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            max={new Date().toISOString().split("T")[0]}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
+            max={getLocalDateStr()}
+            className="date-modern"
           />
         </div>
 
