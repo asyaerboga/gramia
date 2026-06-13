@@ -4,6 +4,15 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Message from "@/lib/models/Message";
 
+function serializeReactions(raw: { emoji: string; userId: string }[]): { emoji: string; users: string[] }[] {
+  const map = new Map<string, string[]>();
+  for (const r of raw || []) {
+    if (!map.has(r.emoji)) map.set(r.emoji, []);
+    map.get(r.emoji)!.push(r.userId);
+  }
+  return Array.from(map.entries()).map(([emoji, users]) => ({ emoji, users }));
+}
+
 // GET /api/messages - Get messages between current user and partner
 export async function GET(request: Request) {
   try {
@@ -35,9 +44,24 @@ export async function GET(request: Request) {
         { senderId: session.user.id, receiverId: partnerId },
         { senderId: partnerId, receiverId: session.user.id },
       ],
-    }).sort({ timestamp: 1 });
+    }).sort({ timestamp: 1 }).lean();
 
-    return NextResponse.json(messages);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serialized = messages.map((m: any) => ({
+      _id: m._id.toString(),
+      senderId: m.senderId?.toString() ?? "",
+      receiverId: m.receiverId?.toString(),
+      type: m.type,
+      content: m.content,
+      filename: m.filename,
+      timestamp: m.timestamp,
+      status: m.status,
+      editedAt: m.editedAt ?? null,
+      isDeleted: m.isDeleted ?? false,
+      reactions: serializeReactions(m.reactions || []),
+    }));
+
+    return NextResponse.json(serialized);
   } catch (error) {
     console.error("Fetch messages error:", error);
     return NextResponse.json(

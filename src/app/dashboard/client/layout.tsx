@@ -55,6 +55,27 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
+  const prevNotifCountRef = useRef(0);
+
+  const fetchAppointmentNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) return;
+      const notifs: { _id: string; title: string; message: string }[] = await res.json();
+      if (notifs.length > prevNotifCountRef.current) {
+        const newest = notifs[0];
+        showToast("info", `🔔 ${newest.title}`, newest.message, 8000);
+      }
+      prevNotifCountRef.current = notifs.length;
+    } catch { /* ignore */ }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchAppointmentNotifications();
+    const interval = setInterval(fetchAppointmentNotifications, 15_000);
+    return () => clearInterval(interval);
+  }, [fetchAppointmentNotifications]);
+
   const fetchUnread = useCallback(async () => {
     try {
       const [countRes, groupRes, senderRes] = await Promise.all([

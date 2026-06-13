@@ -380,16 +380,12 @@ export default function DietitianSettingsPage() {
                 </label>
                 <select
                   value={profile.gender}
-                  onChange={(e) =>
-                    setProfile({ ...profile, gender: e.target.value })
-                  }
+                  onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
                   className="select-modern w-full"
                 >
                   <option value="">Seçiniz</option>
                   {genderOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>

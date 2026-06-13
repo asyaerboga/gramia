@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/mongodb";
 import User from "@/lib/models/User";
+import Client from "@/lib/models/Client";
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -30,6 +31,13 @@ export const authOptions: AuthOptions = {
         );
         if (!isValid) {
           throw new Error("Geçersiz şifre");
+        }
+
+        if (user.role === "client") {
+          const clientDoc = await Client.findOne({ userId: user._id });
+          if (clientDoc && clientDoc.isActive === false) {
+            throw new Error("Hesabınız pasife alınmıştır");
+          }
         }
 
         return {

@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 export interface IConversation extends Document {
   name: string;
+  image?: string;
   createdBy: Types.ObjectId;
   members: Types.ObjectId[];
   lastSeenAt: Map<string, Date>;
@@ -12,6 +13,7 @@ export interface IConversation extends Document {
 const ConversationSchema = new Schema<IConversation>(
   {
     name: { type: String, required: true },
+    image: { type: String },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     members: [{ type: Schema.Types.ObjectId, ref: "User" }],
     lastSeenAt: { type: Map, of: Date, default: {} },

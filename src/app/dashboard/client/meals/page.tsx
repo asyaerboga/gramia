@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import MealCard from "@/components/client/MealCard";
+import DatePickerModern from "@/components/shared/DatePickerModern";
 
 interface MealItem {
   name: string;
@@ -138,53 +139,74 @@ export default function MealsPage() {
   const totalFat = allItems.reduce((sum, i) => sum + (i.fat || 0), 0);
   const macroCalories = totalProtein * 4 + totalCarbs * 4 + totalFat * 9;
   const isToday = selectedDate === todayStr;
+  const isPast = selectedDate < todayStr;
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 to-emerald-50/40 p-4 md:p-6">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-orange-50/30 to-amber-50/20 p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-5">
 
-        {/* Page header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Yemek Günlüğü</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Öğünlerinizi takip edin</p>
-        </div>
+        {/* Hero Banner */}
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-orange-500 via-amber-400 to-yellow-400 p-6 text-white shadow-xl shadow-orange-200">
+          {/* Decorative circles */}
+          <div className="absolute -top-8 -right-8 w-48 h-48 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute -bottom-10 -left-6 w-40 h-40 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute top-4 right-32 w-6 h-6 bg-white/20 rounded-full" />
+          <div className="absolute bottom-6 right-16 w-3 h-3 bg-white/30 rounded-full" />
 
-        {/* Date navigation */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setSelectedDate(addDays(selectedDate, -1))}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors shadow-sm text-xl leading-none"
-          >
-            ‹
-          </button>
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-4xl drop-shadow-lg">🍽️</span>
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Yemek Günlüğü</h1>
+              </div>
+              <p className="text-orange-100 text-sm mt-1 font-medium">Öğünlerinizi takip edin</p>
+            </div>
 
-          <div className="flex-1 flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
-            <span className="font-semibold text-gray-900 text-sm md:text-base">
-              {formatDateLabel(selectedDate)}
-            </span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="text-xs text-gray-400 cursor-pointer focus:outline-none bg-transparent"
-            />
+            {totalCalories > 0 && (
+              <div className="flex gap-3">
+                <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-center border border-white/20">
+                  <p className="text-2xl font-bold">{totalCalories}</p>
+                  <p className="text-xs text-orange-100 font-medium">kcal</p>
+                </div>
+                <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-center border border-white/20">
+                  <p className="text-2xl font-bold">{totalProtein}</p>
+                  <p className="text-xs text-orange-100 font-medium">g protein</p>
+                </div>
+              </div>
+            )}
           </div>
 
-          <button
-            onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors shadow-sm text-xl leading-none"
-          >
-            ›
-          </button>
-
-          {!isToday && (
+          {/* Date navigation */}
+          <div className="relative z-10 mt-5 flex items-center gap-2">
             <button
-              onClick={() => setSelectedDate(todayStr)}
-              className="hidden sm:flex items-center px-3 h-10 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors whitespace-nowrap"
+              onClick={() => setSelectedDate(addDays(selectedDate, -1))}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/15 border border-white/20 text-white hover:bg-white/25 transition-colors text-xl leading-none backdrop-blur-sm shrink-0"
             >
-              Bugün
+              ‹
             </button>
-          )}
+
+            <DatePickerModern
+              value={selectedDate}
+              onChange={setSelectedDate}
+              className="flex-1"
+            />
+
+            <button
+              onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/15 border border-white/20 text-white hover:bg-white/25 transition-colors text-xl leading-none backdrop-blur-sm shrink-0"
+            >
+              ›
+            </button>
+
+            {!isToday && (
+              <button
+                onClick={() => setSelectedDate(todayStr)}
+                className="hidden sm:flex items-center px-3 h-10 text-xs font-semibold text-orange-600 bg-white rounded-xl hover:bg-orange-50 transition-colors whitespace-nowrap shadow-md shrink-0"
+              >
+                Bugün
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Daily summary */}
@@ -244,6 +266,7 @@ export default function MealsPage() {
               onAddItem={handleAddItem}
               satietyLevel={satiety[mealType]}
               onSetSatiety={handleSetSatiety}
+              isPast={isPast}
             />
           ))}
         </div>

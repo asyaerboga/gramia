@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import DatePickerModern from "@/components/shared/DatePickerModern";
+import { useParams, useSearchParams } from "next/navigation";
 import MannequinChart from "@/components/client/MannequinChart";
 import CalorieBar from "@/components/client/CalorieBar";
 import GoalProgressBar from "@/components/client/GoalProgressBar";
@@ -242,9 +243,11 @@ function EmptyState({ message }: { message: string }) {
 
 export default function ClientProfilePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const clientId = params.clientId as string;
 
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const initialTab = (searchParams.get("tab") as TabType) || "overview";
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [dateRange, setDateRange] = useState(7);
   const [client, setClient] = useState<ClientProfile | null>(null);
   const [measurements, setMeasurements] = useState<MeasurementRecord[]>([]);
@@ -1206,8 +1209,7 @@ export default function ClientProfilePage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-gray-500 block mb-1.5">Tarih</label>
-                        <input type="date" value={bloodDate} onChange={(e) => setBloodDate(e.target.value)}
-                          className="date-modern w-full" />
+                        <DatePickerModern value={bloodDate} onChange={setBloodDate} />
                       </div>
                       <div>
                         <label className="text-xs text-gray-500 block mb-1.5">Not (opsiyonel)</label>

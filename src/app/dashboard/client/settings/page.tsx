@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { FaCog, FaSave, FaCamera, FaTrash, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import DatePickerModern from "@/components/shared/DatePickerModern";
 
 interface ClientProfile {
   name: string;
@@ -414,13 +415,9 @@ export default function SettingsPage() {
               <label className="text-sm text-gray-600 block mb-1">
                 Doğum Tarihi
               </label>
-              <input
-                type="date"
+              <DatePickerModern
                 value={profile.birthDate}
-                onChange={(e) =>
-                  setProfile({ ...profile, birthDate: e.target.value })
-                }
-                className="date-modern w-full"
+                onChange={(v) => setProfile({ ...profile, birthDate: v })}
               />
             </div>
           </div>
@@ -432,16 +429,12 @@ export default function SettingsPage() {
               </label>
               <select
                 value={profile.gender}
-                onChange={(e) =>
-                  setProfile({ ...profile, gender: e.target.value })
-                }
+                onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
                 className="select-modern w-full"
               >
                 <option value="">Seçiniz</option>
                 {genderOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>

@@ -15,7 +15,17 @@ import {
   FaBolt,
   FaArrowRight,
   FaCheckCircle,
+  FaTimes,
+  FaBell,
 } from "react-icons/fa";
+
+interface AppointmentNotification {
+  _id: string;
+  type: string;
+  title: string;
+  message: string;
+  createdAt: string;
+}
 
 interface Appointment {
   _id: string;
@@ -96,6 +106,32 @@ export default function ClientDashboard() {
     recentAchievements: [],
   });
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<AppointmentNotification[]>([]);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications", { cache: "no-store" });
+      if (res.ok) setNotifications(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  const dismissNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n._id !== id));
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [id] }),
+    }).catch(() => {});
+  };
+
+  const dismissAll = async () => {
+    setNotifications([]);
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }).catch(() => {});
+  };
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -110,6 +146,12 @@ export default function ClientDashboard() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+    const notifPoll = setInterval(fetchNotifications, 15_000);
+    return () => clearInterval(notifPoll);
+  }, [fetchNotifications]);
 
   useEffect(() => {
     fetchSummary();
@@ -158,31 +200,72 @@ export default function ClientDashboard() {
     return labels[level - 1] || "Orta";
   };
 
-  const MacroBar = ({
+  const getMoodGradient = (mood: number) => {
+    const g = [
+      "from-blue-500 to-indigo-600",
+      "from-slate-500 to-blue-500",
+      "from-amber-400 to-yellow-500",
+      "from-emerald-400 to-teal-500",
+      "from-orange-400 to-amber-400",
+    ];
+    return g[mood - 1] ?? g[2];
+  };
+
+  const getMoodLabel = (mood: number) => {
+    const labels = ["Üzgün", "Keyifsiz", "İdare Eder", "İyi", "Harika!"];
+    return labels[mood - 1] ?? "İdare Eder";
+  };
+
+  const getVibeMessage = (mood: number, energy: number) => {
+    const avg = (mood + energy) / 2;
+    if (avg >= 4.5) return "Bugün yıldızsın! Harika enerjin var ✨";
+    if (avg >= 3.5) return "İyi bir gün seni bekliyor! 🌿";
+    if (avg >= 2.5) return "Adım adım ilerliyorsun! 💪";
+    return "Kendine iyi bak, yarın daha iyi olacak 🌱";
+  };
+
+  const MacroRing = ({
     label,
     current,
     target,
-    color,
+    stroke,
+    emoji,
   }: {
     label: string;
     current: number;
     target: number;
-    color: string;
+    stroke: string;
+    emoji: string;
   }) => {
-    const percentage = Math.min((current / target) * 100, 100);
+    const pct = Math.min((current / target) * 100, 100);
+    const r = 24;
+    const circ = 2 * Math.PI * r;
+    const offset = circ - (pct / 100) * circ;
     return (
-      <div className="space-y-1">
-        <div className="flex justify-between text-xs">
-          <span className="text-gray-600">{label}</span>
-          <span className="font-medium text-gray-900">
-            {current}g / {target}g
-          </span>
+      <div className="flex flex-col items-center gap-1.5">
+        <div className="relative">
+          <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
+            <circle cx="32" cy="32" r={r} fill="none" stroke="#f3f4f6" strokeWidth="7" />
+            <circle
+              cx="32" cy="32" r={r}
+              fill="none"
+              stroke={stroke}
+              strokeWidth="7"
+              strokeLinecap="round"
+              strokeDasharray={circ}
+              strokeDashoffset={offset}
+              style={{ transition: "stroke-dashoffset 0.7s ease" }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-base">{emoji}</span>
+          </div>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full progress-bar ${color}`}
-            style={{ width: `${percentage}%` }}
-          />
+        <div className="text-center">
+          <p className="text-sm font-bold text-gray-900 leading-none">{current}g</p>
+          <p className="text-xs text-gray-400">/{target}g</p>
+          <p className="text-xs font-semibold text-gray-500 mt-0.5">{label}</p>
+          <p className="text-xs font-bold mt-0.5" style={{ color: stroke }}>{Math.round(pct)}%</p>
         </div>
       </div>
     );
@@ -190,17 +273,17 @@ export default function ClientDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
+      <div className="min-h-screen bg-linear-to-br from-emerald-50 to-white p-4 md:p-6">
         <div className="max-w-7xl mx-auto animate-pulse space-y-6">
-          <div className="h-10 bg-gray-200 rounded-lg w-1/3" />
+          <div className="h-32 bg-linear-to-r from-emerald-200 to-teal-200 rounded-2xl" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-xl" />
+              <div key={i} className="h-28 bg-gray-200 rounded-2xl" />
             ))}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="h-48 bg-gray-200 rounded-2xl lg:col-span-2" />
-            <div className="h-48 bg-gray-200 rounded-2xl" />
+            <div className="h-52 bg-gray-200 rounded-2xl lg:col-span-2" />
+            <div className="h-52 bg-gray-200 rounded-2xl" />
           </div>
         </div>
       </div>
@@ -208,265 +291,374 @@ export default function ClientDashboard() {
   }
 
   const totalExerciseCalories = summary.todayExercise?.totalCaloriesBurned || 0;
+  const caloriePercent = summary.targetCalories > 0
+    ? Math.round((summary.totalCalories / summary.targetCalories) * 100)
+    : 0;
+
+  const notifColors: Record<string, { bg: string; border: string; icon: string }> = {
+    appointment_confirmed:      { bg: "bg-emerald-50",  border: "border-emerald-400", icon: "text-emerald-600" },
+    appointment_cancelled:      { bg: "bg-red-50",      border: "border-red-400",     icon: "text-red-600" },
+    appointment_completed:      { bg: "bg-blue-50",     border: "border-blue-400",    icon: "text-blue-600" },
+    appointment_time_changed:   { bg: "bg-amber-50",    border: "border-amber-400",   icon: "text-amber-600" },
+    appointment_deleted:        { bg: "bg-red-50",      border: "border-red-400",     icon: "text-red-600" },
+    appointment_status_changed: { bg: "bg-violet-50",   border: "border-violet-400",  icon: "text-violet-600" },
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-emerald-50/50 to-teal-50/30">
+    <div className="min-h-screen bg-linear-to-br from-slate-100 via-emerald-50/50 to-teal-50/30">
+      {/* Notification banners */}
+      {notifications.length > 0 && (
+        <div className="px-4 md:px-6 pt-4 space-y-2">
+          {notifications.map((notif) => {
+            const colors = notifColors[notif.type] ?? { bg: "bg-gray-50", border: "border-gray-400", icon: "text-gray-600" };
+            return (
+              <div
+                key={notif._id}
+                className={`flex items-start gap-3 px-4 py-3 rounded-xl border-l-4 shadow-md animate-in slide-in-from-top-2 duration-300 ${colors.bg} ${colors.border}`}
+              >
+                <FaBell className={`mt-0.5 shrink-0 text-lg ${colors.icon}`} />
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold text-sm ${colors.icon}`}>{notif.title}</p>
+                  <p className="text-gray-700 text-sm mt-0.5">{notif.message}</p>
+                </div>
+                <button
+                  onClick={() => dismissNotification(notif._id)}
+                  className="shrink-0 text-gray-400 hover:text-gray-600 transition p-1 rounded"
+                  aria-label="Kapat"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+            );
+          })}
+          {notifications.length > 1 && (
+            <div className="flex justify-end">
+              <button
+                onClick={dismissAll}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Tümünü kapat
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row">
         {/* Main content */}
-        <div className="flex-1 p-4 md:p-6">
-          {/* Header with Streak */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-            <div className="flex items-center gap-3">
-              {avatarImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarImage}
-                  alt="Profil"
-                  className="w-12 h-12 rounded-full object-cover border-2 border-emerald-200 shrink-0"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-lg border-2 border-emerald-200 shrink-0">
-                  {session?.user?.name?.charAt(0) || "D"}
+        <div className="flex-1 p-4 md:p-6 space-y-5">
+
+          {/* Hero Header */}
+          <div className="relative overflow-hidden bg-linear-to-r from-emerald-600 via-emerald-500 to-teal-500 rounded-2xl p-6 shadow-lg shadow-emerald-300/30">
+            {/* Decorative blobs */}
+            <div className="absolute -right-10 -top-10 w-44 h-44 bg-white/10 rounded-full pointer-events-none" />
+            <div className="absolute right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full pointer-events-none" />
+            <div className="absolute right-36 top-4 w-16 h-16 bg-white/5 rounded-full pointer-events-none" />
+
+            <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+              <div className="flex items-center gap-4">
+                {avatarImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarImage}
+                    alt="Profil"
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-white/40 shadow-lg shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-bold text-2xl border-2 border-white/30 shadow-lg shrink-0">
+                    {session?.user?.name?.charAt(0) || "D"}
+                  </div>
+                )}
+                <div>
+                  <p className="text-emerald-100 text-sm font-medium">
+                    {new Date().toLocaleDateString("tr-TR", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                    })}
+                  </p>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white mt-0.5">
+                    Hoş Geldin, {session?.user?.name?.split(" ")[0] || "Danışan"} 👋
+                  </h2>
                 </div>
-              )}
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                  Hoş Geldin, {session?.user?.name?.split(" ")[0] || "Danışan"} 👋
-                </h2>
-                <p className="text-gray-500 text-sm mt-1">
-                  {new Date().toLocaleDateString("tr-TR", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })}
-                </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2 md:gap-4">
-              {/* Streak Badge */}
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 md:px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-orange-300/50">
-                <FaFire className="text-yellow-300" />
-                <span className="font-bold">{summary.loginStreak}</span>
-                <span className="text-xs md:text-sm opacity-90">gün seri</span>
-              </div>
-              {/* Points Badge */}
-              <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-3 md:px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-violet-300/50">
-                <FaTrophy className="text-yellow-300" />
-                <span className="font-bold">{summary.totalPoints}</span>
-                <span className="text-xs md:text-sm opacity-90">puan</span>
+
+              <div className="flex items-center gap-3">
+                <div className="bg-linear-to-r from-orange-500 to-red-500 text-white px-4 py-2.5 rounded-xl flex items-center gap-2.5 shadow-lg shadow-orange-400/40">
+                  <FaFire className="text-yellow-300 text-lg shrink-0" />
+                  <div>
+                    <p className="font-bold text-lg leading-tight">{summary.loginStreak}</p>
+                    <p className="text-orange-100 text-xs leading-tight">gün seri</p>
+                  </div>
+                </div>
+                <div className="bg-linear-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2.5 shadow-lg shadow-violet-400/40">
+                  <FaTrophy className="text-yellow-300 text-lg shrink-0" />
+                  <div>
+                    <p className="font-bold text-lg leading-tight">{summary.totalPoints}</p>
+                    <p className="text-violet-100 text-xs leading-tight">puan</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Quick Stats Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             {/* Kalori */}
-            <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-4 shadow-lg shadow-orange-200/40 card-hover">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
-                  <FaFire className="text-white text-sm" />
+            <Link href="/dashboard/client/meals" className="bg-linear-to-br from-orange-100 to-red-100 rounded-2xl p-4 shadow-sm border border-orange-200 card-hover block">
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 bg-white/60 rounded-xl flex items-center justify-center">
+                  <FaFire className="text-orange-500" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-orange-100">Kalori</p>
-                  <p className="font-bold text-white leading-tight">
-                    {summary.totalCalories}
-                    <span className="text-orange-200 font-normal text-xs">
-                      /{summary.targetCalories}
-                    </span>
-                  </p>
-                </div>
+                <span className="text-xs font-semibold text-orange-600 bg-white/60 px-2 py-0.5 rounded-full">
+                  {caloriePercent}%
+                </span>
               </div>
-            </div>
+              <p className="text-2xl font-bold text-orange-900 leading-tight">{summary.totalCalories}</p>
+              <p className="text-xs text-orange-500 mt-0.5">/ {summary.targetCalories} kcal</p>
+              <p className="text-xs font-semibold text-orange-700 mt-2 uppercase tracking-wide">Kalori</p>
+            </Link>
+
             {/* Egzersiz */}
-            <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl p-4 shadow-lg shadow-violet-200/40 card-hover">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
-                  <FaDumbbell className="text-white text-sm" />
+            <Link href="/dashboard/client/exercises" className="bg-linear-to-br from-violet-100 to-purple-100 rounded-2xl p-4 shadow-sm border border-violet-200 card-hover block">
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 bg-white/60 rounded-xl flex items-center justify-center">
+                  <FaDumbbell className="text-violet-500" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-violet-100">Egzersiz</p>
-                  <p className="font-bold text-white leading-tight">
-                    {totalExerciseCalories}
-                    <span className="text-violet-200 font-normal text-xs"> kcal</span>
-                  </p>
-                </div>
+                {summary.todayExercise?.exerciseCount ? (
+                  <span className="text-xs font-semibold text-violet-600 bg-white/60 px-2 py-0.5 rounded-full">
+                    {summary.todayExercise.exerciseCount}x
+                  </span>
+                ) : null}
               </div>
-            </div>
+              <p className="text-2xl font-bold text-violet-900 leading-tight">{totalExerciseCalories}</p>
+              <p className="text-xs text-violet-500 mt-0.5">kcal yakıldı</p>
+              <p className="text-xs font-semibold text-violet-700 mt-2 uppercase tracking-wide">Egzersiz</p>
+            </Link>
+
             {/* Uyku */}
-            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl p-4 shadow-lg shadow-indigo-200/40 card-hover">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
-                  <FaMoon className="text-white text-sm" />
+            <Link href="/dashboard/client/wellness?tab=sleep" className="bg-linear-to-br from-indigo-100 to-blue-100 rounded-2xl p-4 shadow-sm border border-indigo-200 card-hover block">
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 bg-white/60 rounded-xl flex items-center justify-center">
+                  <FaMoon className="text-indigo-500" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-indigo-100">Uyku</p>
-                  <p className="font-bold text-white leading-tight">
-                    {summary.todaySleep?.duration || "-"}
-                    <span className="text-indigo-200 font-normal text-xs"> saat</span>
-                  </p>
-                </div>
+                {summary.todaySleep?.quality ? (
+                  <span className="text-xs font-semibold text-indigo-600 bg-white/60 px-2 py-0.5 rounded-full">
+                    ★ {summary.todaySleep.quality}/5
+                  </span>
+                ) : null}
               </div>
-            </div>
+              <p className="text-2xl font-bold text-indigo-900 leading-tight">
+                {summary.todaySleep?.duration || "—"}
+              </p>
+              <p className="text-xs text-indigo-500 mt-0.5">saat uyku</p>
+              <p className="text-xs font-semibold text-indigo-700 mt-2 uppercase tracking-wide">Uyku</p>
+            </Link>
+
             {/* Ruh Hali */}
-            <div className="bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl p-4 shadow-lg shadow-amber-200/40 card-hover">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
-                  <FaSmile className="text-white text-sm" />
+            <Link href="/dashboard/client/wellness?tab=checkin" className="bg-linear-to-br from-amber-100 to-yellow-100 rounded-2xl p-4 shadow-sm border border-amber-200 card-hover block">
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 bg-white/60 rounded-xl flex items-center justify-center">
+                  <FaSmile className="text-amber-500" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-amber-100">Ruh Hali</p>
-                  <p className="font-bold text-white text-xl leading-tight">
-                    {summary.todayCheckIn ? getMoodEmoji(summary.todayCheckIn.mood) : "-"}
-                  </p>
-                </div>
+                {summary.todayCheckIn?.energyLevel ? (
+                  <span className="text-xs font-semibold text-amber-600 bg-white/60 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                    <FaBolt className="text-xs" />{summary.todayCheckIn.energyLevel}/5
+                  </span>
+                ) : null}
               </div>
-            </div>
+              <p className="text-3xl leading-tight">
+                {summary.todayCheckIn ? getMoodEmoji(summary.todayCheckIn.mood) : "—"}
+              </p>
+              <p className="text-xs text-amber-500 mt-0.5">
+                {summary.todayCheckIn ? "Kayıtlı" : "Kayıt yok"}
+              </p>
+              <p className="text-xs font-semibold text-amber-700 mt-2 uppercase tracking-wide">Ruh Hali</p>
+            </Link>
           </div>
 
-          {/* Main Cards Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            {/* Calorie + Macros Card */}
-            <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                🍽️ Günlük Besin Takibi
-              </h3>
-              <div className="mb-6">
+          {/* Nutrition + Water */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Calorie + Macros */}
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-50">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2.5">
+                  <span className="w-8 h-8 bg-linear-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center text-base shadow-sm">🍽️</span>
+                  Günlük Besin Takibi
+                </h3>
+                <Link
+                  href="/dashboard/client/meals"
+                  className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
+                >
+                  Öğün Ekle <FaArrowRight className="text-xs" />
+                </Link>
+              </div>
+              <div className="p-6 space-y-6">
                 <CalorieBar
                   current={summary.totalCalories}
                   target={summary.targetCalories}
                   burned={totalExerciseCalories}
                 />
+                <div className="border-t border-gray-50 pt-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Makro Dağılımı</p>
+                  <div className="flex justify-around">
+                    <MacroRing label="Protein" current={summary.totalProtein} target={summary.targetProtein} stroke="#ef4444" emoji="🥩" />
+                    <MacroRing label="Karbonhidrat" current={summary.totalCarbs} target={summary.targetCarbs} stroke="#f59e0b" emoji="🍞" />
+                    <MacroRing label="Yağ" current={summary.totalFat} target={summary.targetFat} stroke="#3b82f6" emoji="🥑" />
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <MacroBar
-                  label="Protein"
-                  current={summary.totalProtein}
-                  target={summary.targetProtein}
-                  color="bg-red-500"
-                />
-                <MacroBar
-                  label="Karbonhidrat"
-                  current={summary.totalCarbs}
-                  target={summary.targetCarbs}
-                  color="bg-amber-500"
-                />
-                <MacroBar
-                  label="Yağ"
-                  current={summary.totalFat}
-                  target={summary.targetFat}
-                  color="bg-blue-500"
-                />
-              </div>
-              <Link
-                href="/dashboard/client/meals"
-                className="mt-4 inline-flex items-center text-sm text-emerald-600 hover:text-emerald-700"
-              >
-                Öğün ekle <FaArrowRight className="ml-1 text-xs" />
-              </Link>
             </div>
 
             {/* Water Tracker */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                💧 Su Takibi
-              </h3>
-              <WaterTracker
-                current={summary.waterIntake}
-                target={summary.waterTarget}
-                onUpdate={handleWaterUpdate}
-              />
+            <div className="bg-linear-to-b from-blue-50/60 to-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+              <div className="px-6 pt-5 pb-4 border-b border-blue-100/60">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2.5">
+                  <span className="w-8 h-8 bg-linear-to-br from-blue-100 to-cyan-100 rounded-xl flex items-center justify-center text-base shadow-sm">💧</span>
+                  Su Takibi
+                </h3>
+              </div>
+              <div className="p-6">
+                <WaterTracker
+                  current={summary.waterIntake}
+                  target={summary.waterTarget}
+                  onUpdate={handleWaterUpdate}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Goal + Today's Activity Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Goal + Daily Status */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* Goal Progress */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                🎯 Kilo Hedefi
-              </h3>
-              <GoalProgressBar
-                startWeight={summary.startWeight}
-                currentWeight={summary.currentWeight}
-                targetWeight={summary.targetWeight}
-              />
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-6 pt-5 pb-4 border-b border-gray-50">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2.5">
+                  <span className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-base">🎯</span>
+                  Kilo Hedefi
+                </h3>
+              </div>
+              <div className="p-6">
+                <GoalProgressBar
+                  startWeight={summary.startWeight}
+                  currentWeight={summary.currentWeight}
+                  targetWeight={summary.targetWeight}
+                />
+              </div>
             </div>
 
             {/* Today's Check-in */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  ✨ Günlük Durum
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-50">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2.5">
+                  <span className="w-8 h-8 bg-yellow-50 rounded-xl flex items-center justify-center text-base">✨</span>
+                  Günlük Durum
                 </h3>
                 <Link
                   href="/dashboard/client/wellness"
-                  className="text-sm text-emerald-600 hover:text-emerald-700 flex items-center"
+                  className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
                 >
-                  Güncelle <FaArrowRight className="ml-1 text-xs" />
+                  Güncelle <FaArrowRight className="text-xs" />
                 </Link>
               </div>
-              {summary.todayCheckIn ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-yellow-50 rounded-xl p-4 text-center">
-                    <p className="text-3xl mb-1">
-                      {getMoodEmoji(summary.todayCheckIn.mood)}
-                    </p>
-                    <p className="text-xs text-gray-500">Ruh Hali</p>
-                  </div>
-                  <div className="bg-purple-50 rounded-xl p-4 text-center">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <FaBolt className="text-purple-500" />
-                      <span className="font-bold text-purple-700">
-                        {summary.todayCheckIn.energyLevel}/5
-                      </span>
+              <div className="p-5">
+                {summary.todayCheckIn ? (
+                  <div className="space-y-3">
+                    {/* Mood + Energy row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Mood card */}
+                      <div className={`relative overflow-hidden bg-linear-to-br ${getMoodGradient(summary.todayCheckIn.mood)} rounded-2xl p-4 text-white text-center shadow-md`}>
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_60%)]" />
+                        <div className="relative">
+                          <p className="text-4xl mb-1.5 drop-shadow">{getMoodEmoji(summary.todayCheckIn.mood)}</p>
+                          <p className="text-xs font-black uppercase tracking-widest text-white/70">Ruh Hali</p>
+                          <p className="text-sm font-bold text-white mt-0.5">{getMoodLabel(summary.todayCheckIn.mood)}</p>
+                        </div>
+                      </div>
+
+                      {/* Energy card */}
+                      <div className="relative overflow-hidden bg-linear-to-br from-violet-600 to-purple-700 rounded-2xl p-4 text-white text-center shadow-md">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.15),transparent_55%)]" />
+                        <div className="relative">
+                          <div className="flex items-end justify-center gap-1 mb-2 h-8">
+                            {[1, 2, 3, 4, 5].map((bar) => (
+                              <div
+                                key={bar}
+                                className="w-3 rounded-t-sm transition-all duration-500"
+                                style={{
+                                  height: `${bar * 20}%`,
+                                  background: bar <= summary.todayCheckIn!.energyLevel
+                                    ? "rgba(255,255,255,0.9)"
+                                    : "rgba(255,255,255,0.18)",
+                                  boxShadow: bar <= summary.todayCheckIn!.energyLevel
+                                    ? "0 0 6px rgba(255,255,255,0.5)"
+                                    : "none",
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-xs font-black uppercase tracking-widest text-white/70">Enerji</p>
+                          <p className="text-sm font-bold text-white mt-0.5">{getEnergyLabel(summary.todayCheckIn.energyLevel)}</p>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      {getEnergyLabel(summary.todayCheckIn.energyLevel)}
-                    </p>
+
+                    {/* Vibe message */}
+                    <div className="bg-linear-to-r from-slate-50 to-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex items-center gap-2.5">
+                      <span className="text-xl shrink-0">💬</span>
+                      <p className="text-sm text-gray-600 font-medium leading-snug">
+                        {getVibeMessage(summary.todayCheckIn.mood, summary.todayCheckIn.energyLevel)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-gray-400 text-sm mb-3">
-                    Bugün henüz check-in yapmadınız
-                  </p>
-                  <Link
-                    href="/dashboard/client/wellness"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-sm"
-                  >
-                    <FaCheckCircle /> Check-in Yap
-                  </Link>
-                </div>
-              )}
+                ) : (
+                  <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-amber-50 via-yellow-50 to-orange-50 border border-amber-100 p-6 text-center">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(251,191,36,0.18),transparent_65%)]" />
+                    <div className="relative">
+                      <div className="text-4xl mb-1 animate-bounce inline-block">🌟</div>
+                      <div className="flex justify-center gap-1 mb-3">
+                        {["✨", "💫", "⭐"].map((s, i) => (
+                          <span key={i} className="text-sm opacity-50">{s}</span>
+                        ))}
+                      </div>
+                      <p className="text-gray-800 font-bold text-sm mb-1">Bugün nasılsın?</p>
+                      <p className="text-gray-400 text-xs mb-4">Ruh halini ve enerjini kaydet</p>
+                      <Link
+                        href="/dashboard/client/wellness"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-amber-400 to-orange-500 text-white rounded-xl hover:from-amber-500 hover:to-orange-600 transition text-sm font-bold shadow-lg shadow-amber-300/40"
+                      >
+                        <FaCheckCircle /> Check-in Yap
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Recent Achievements */}
           {summary.recentAchievements?.length > 0 && (
-            <div className="bg-linear-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-100">
+            <div className="bg-linear-to-r from-amber-50 via-orange-50 to-yellow-50 rounded-2xl p-6 border border-amber-100">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  🏆 Son Kazanılan Rozetler
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2.5">
+                  <span className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-base">🏆</span>
+                  Son Kazanılan Rozetler
                 </h3>
                 <Link
                   href="/dashboard/client/achievements"
-                  className="text-sm text-amber-600 hover:text-amber-700 flex items-center"
+                  className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 font-medium"
                 >
-                  Tümünü Gör <FaArrowRight className="ml-1 text-xs" />
+                  Tümünü Gör <FaArrowRight className="text-xs" />
                 </Link>
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-2">
+              <div className="flex gap-3 overflow-x-auto pb-1">
                 {summary.recentAchievements.map((achievement) => (
                   <div
                     key={achievement.achievementId}
-                    className="shrink-0 bg-white rounded-xl p-4 text-center shadow-sm min-w-30"
+                    className="shrink-0 bg-white rounded-2xl p-4 text-center shadow-sm border border-amber-100 min-w-28 card-hover"
                   >
-                    <span className="text-3xl block mb-2">
-                      {achievement.icon}
-                    </span>
-                    <p className="text-sm font-medium text-gray-900">
-                      {achievement.name}
-                    </p>
+                    <span className="text-3xl block mb-2">{achievement.icon}</span>
+                    <p className="text-xs font-semibold text-gray-800 leading-tight">{achievement.name}</p>
                   </div>
                 ))}
               </div>
@@ -475,118 +667,128 @@ export default function ClientDashboard() {
         </div>
 
         {/* Right panel */}
-        <aside className="w-full lg:w-80 bg-white lg:min-h-screen p-4 md:p-6 shadow-sm lg:border-l border-t lg:border-t-0 border-gray-100">
+        <aside className="w-full lg:w-80 p-4 md:p-6 space-y-5 lg:border-l border-t lg:border-t-0 border-gray-100 bg-white/60 backdrop-blur-sm">
+
           {/* Appointments */}
-          <div className="mb-8">
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              📅 Randevularım
-            </h3>
-            <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-7 h-7 bg-emerald-50 rounded-lg flex items-center justify-center text-sm">📅</span>
+                Randevularım
+              </h3>
+              <Link href="/dashboard/client/appointments" className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+                Tümü →
+              </Link>
+            </div>
+            <div className="space-y-2">
               {summary.upcomingAppointments.length > 0 ? (
                 summary.upcomingAppointments.slice(0, 3).map((apt) => (
                   <div
                     key={apt._id}
-                    className="bg-emerald-50 rounded-xl p-4 border border-emerald-100"
+                    className="bg-linear-to-r from-emerald-50 to-teal-50 rounded-xl p-3.5 border border-emerald-100 card-hover"
                   >
-                    <p className="text-sm font-semibold text-gray-900">
-                      📅{" "}
-                      {new Date(apt.date).toLocaleDateString("tr-TR", {
-                        day: "numeric",
-                        month: "long",
-                      })}
-                    </p>
-                    <p className="text-sm text-gray-600">⏰ {apt.time}</p>
-                    {apt.dietitianName && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        {apt.dietitianName}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="bg-emerald-500 text-white rounded-xl px-2.5 py-2 text-center shrink-0 min-w-12">
+                        <p className="text-base font-bold leading-tight">
+                          {new Date(apt.date).toLocaleDateString("tr-TR", { day: "numeric" })}
+                        </p>
+                        <p className="text-xs opacity-80 leading-tight uppercase">
+                          {new Date(apt.date).toLocaleDateString("tr-TR", { month: "short" })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">⏰ {apt.time}</p>
+                        {apt.dietitianName && (
+                          <p className="text-xs text-gray-500 mt-0.5">{apt.dietitianName}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-400 text-center py-4">
-                  Yaklaşan randevu yok
-                </p>
+                <div className="text-center py-6 bg-gray-50 rounded-xl">
+                  <p className="text-sm text-gray-400">Yaklaşan randevu yok</p>
+                </div>
               )}
             </div>
           </div>
 
+          <div className="border-t border-gray-100" />
+
           {/* Today's Exercises */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                🏃 Bugünkü Egzersiz
+                <span className="w-7 h-7 bg-violet-50 rounded-lg flex items-center justify-center text-sm">🏃</span>
+                Bugünkü Egzersiz
               </h3>
-              <Link
-                href="/dashboard/client/exercises"
-                className="text-xs text-emerald-600 hover:text-emerald-700"
-              >
+              <Link href="/dashboard/client/exercises" className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
                 + Ekle
               </Link>
             </div>
-            <div className="space-y-2">
-              {summary.todayExercise &&
-              summary.todayExercise.exerciseCount > 0 ? (
-                <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm font-medium text-gray-900">
-                      {summary.todayExercise.exerciseCount} egzersiz
-                    </p>
-                    <span className="text-xs text-purple-600 font-semibold">
-                      {summary.todayExercise.totalCaloriesBurned} kcal
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Toplam {summary.todayExercise.totalMinutes} dakika
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 text-center py-4">
-                  Henüz egzersiz eklenmedi
+            {summary.todayExercise && summary.todayExercise.exerciseCount > 0 ? (
+              <div className="bg-linear-to-r from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-100">
+                <p className="text-sm font-semibold text-gray-800 mb-3">
+                  {summary.todayExercise.exerciseCount} egzersiz tamamlandı
                 </p>
-              )}
-            </div>
-          </div>
-
-          {/* Sleep Summary */}
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              😴 Uyku Özeti
-            </h3>
-            {summary.todaySleep ? (
-              <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Süre</span>
-                  <span className="font-semibold text-gray-900">
-                    {summary.todaySleep.duration} saat
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Kalite</span>
-                  <div className="flex">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <span
-                        key={star}
-                        className={
-                          star <= summary.todaySleep!.quality
-                            ? "text-yellow-400"
-                            : "text-gray-300"
-                        }
-                      >
-                        ★
-                      </span>
-                    ))}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white rounded-xl p-3 text-center">
+                    <p className="text-xl font-bold text-violet-600">{summary.todayExercise.totalCaloriesBurned}</p>
+                    <p className="text-xs text-gray-400">kcal</p>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 text-center">
+                    <p className="text-xl font-bold text-violet-600">{summary.todayExercise.totalMinutes}</p>
+                    <p className="text-xs text-gray-400">dakika</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
+              <div className="text-center py-5 bg-gray-50 rounded-xl">
+                <p className="text-sm text-gray-400">Henüz egzersiz eklenmedi</p>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-gray-100" />
+
+          {/* Sleep Summary */}
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <span className="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center text-sm">😴</span>
+              Uyku Özeti
+            </h3>
+            {summary.todaySleep ? (
+              <div className="bg-linear-to-r from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-bold text-indigo-700 leading-tight">
+                      {summary.todaySleep.duration}
+                      <span className="text-base font-normal text-indigo-400 ml-1">saat</span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex gap-0.5 justify-end mb-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                          key={star}
+                          className={`text-lg ${star <= summary.todaySleep!.quality ? "text-yellow-400" : "text-gray-200"}`}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-400">Kalite</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-5 bg-gray-50 rounded-xl">
                 <p className="text-sm text-gray-400 mb-2">Uyku kaydı yok</p>
                 <Link
                   href="/dashboard/client/wellness"
-                  className="text-xs text-emerald-600 hover:text-emerald-700"
+                  className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
                 >
-                  Uyku Kaydet
+                  Uyku Kaydet →
                 </Link>
               </div>
             )}

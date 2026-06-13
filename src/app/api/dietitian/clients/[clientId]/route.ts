@@ -26,7 +26,7 @@ export async function GET(
       dietitianId: session.user.id,
     }).populate("userId", "name email image");
 
-    if (!client) {
+    if (!client || client.isActive === false) {
       return NextResponse.json(
         { error: "Danışan bulunamadı" },
         { status: 404 }
@@ -70,6 +70,37 @@ export async function GET(
   }
 }
 
+// DELETE /api/dietitian/clients/[clientId] - Soft-delete client (set isActive: false)
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ clientId: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "dietitian") {
+      return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
+    }
+
+    const { clientId } = await params;
+    await dbConnect();
+
+    const result = await Client.findOneAndUpdate(
+      { _id: clientId, dietitianId: session.user.id },
+      { $set: { isActive: false } },
+      { new: true, strict: false }
+    );
+
+    if (!result) {
+      return NextResponse.json({ error: "Danışan bulunamadı" }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "Danışan pasife alındı" });
+  } catch (error) {
+    console.error("Delete client error:", error);
+    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+  }
+}
+
 // PATCH /api/dietitian/clients/[clientId] - Update client weight
 export async function PATCH(
   request: Request,
@@ -82,18 +113,19 @@ export async function PATCH(
     }
 
     const { clientId } = await params;
-    const { weight, targetWeight } = await request.json();
+    const { weight, targetWeight, isActive } = await request.json();
 
     await dbConnect();
 
-    const updateData: Record<string, number> = {};
+    const updateData: Record<string, unknown> = {};
     if (weight) updateData.weight = weight;
     if (targetWeight) updateData.targetWeight = targetWeight;
+    if (isActive === true) updateData.isActive = true;
 
     const client = await Client.findOneAndUpdate(
       { _id: clientId, dietitianId: session.user.id },
       { $set: updateData },
-      { new: true }
+      { new: true, strict: false }
     );
 
     if (!client) {

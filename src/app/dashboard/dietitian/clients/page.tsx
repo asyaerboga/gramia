@@ -14,6 +14,12 @@ import {
   FaArrowRight,
   FaSortAmountDown,
   FaTimes,
+  FaTrash,
+  FaExclamationTriangle,
+  FaChevronDown,
+  FaChevronUp,
+  FaUserSlash,
+  FaUserCheck,
 } from "react-icons/fa";
 
 interface ClientData {
@@ -44,7 +50,7 @@ function ProgressRing({
   const circ = 2 * Math.PI * r;
   const offset = circ - (Math.min(pct, 100) / 100) * circ;
   const color =
-    pct >= 75 ? "#10b981" : pct >= 40 ? "#f59e0b" : "#6366f1";
+    pct === 0 ? "#6366f1" : pct >= 100 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -77,9 +83,11 @@ function ProgressRing({
 function ClientCard({
   client,
   onProfile,
+  onDelete,
 }: {
   client: ClientData;
   onProfile: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
 }) {
   const totalChange = client.startWeight - client.targetWeight;
   const change = client.startWeight - client.currentWeight;
@@ -91,18 +99,22 @@ function ClientCard({
   const activeToday = client.totalCalories > 0;
 
   const accentColor =
-    pct >= 75
+    pct === 0
+      ? "from-indigo-400 to-purple-500"
+      : pct >= 100
       ? "from-emerald-400 to-teal-500"
-      : pct >= 40
+      : pct >= 50
       ? "from-amber-400 to-orange-500"
-      : "from-indigo-400 to-purple-500";
+      : "from-red-400 to-rose-500";
 
   const badgeColor =
-    pct >= 75
+    pct === 0
+      ? "bg-indigo-100 text-indigo-700"
+      : pct >= 100
       ? "bg-emerald-100 text-emerald-700"
-      : pct >= 40
+      : pct >= 50
       ? "bg-amber-100 text-amber-700"
-      : "bg-indigo-100 text-indigo-700";
+      : "bg-red-100 text-red-700";
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col">
@@ -218,6 +230,13 @@ function ClientCard({
           >
             Profil <FaArrowRight className="text-[10px]" />
           </button>
+          <button
+            onClick={() => onDelete(client._id, client.name)}
+            title="Danışanı kaldır"
+            className="flex items-center justify-center w-8 h-8 mt-auto text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
+          >
+            <FaTrash className="text-xs" />
+          </button>
         </div>
       </div>
     </div>
@@ -231,12 +250,23 @@ export default function DietitianClientsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [inactiveClients, setInactiveClients] = useState<{ _id: string; name: string; email: string; image: string | null; age: number }[]>([]);
+  const [loadingInactive, setLoadingInactive] = useState(false);
+  const [activating, setActivating] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [form, setForm] = useState({
-    name: "", email: "", password: "",
+    name: "", email: "", password: "", phone: "",
+    gender: "" as "" | "male" | "female",
     age: "", height: "", weight: "", targetWeight: "",
-    chronicDiseases: "",
+    activityLevel: "moderate" as "sedentary" | "light" | "moderate" | "active" | "very_active",
+    chronicDiseases: "", allergies: "", medications: "",
+    goals: "", occupation: "",
+    targetCalories: "", targetProtein: "", targetCarbs: "",
+    targetFat: "", targetWater: "",
   });
 
   const fetchClients = useCallback(async () => {
@@ -294,17 +324,79 @@ export default function DietitianClientsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name, email: form.email, password: form.password,
+          phone: form.phone || undefined,
+          gender: form.gender || undefined,
           age: parseInt(form.age), height: parseInt(form.height),
           weight: parseFloat(form.weight), targetWeight: parseFloat(form.targetWeight),
+          activityLevel: form.activityLevel,
           chronicDiseases: form.chronicDiseases.split(",").map((d) => d.trim()).filter(Boolean),
+          allergies: form.allergies.split(",").map((d) => d.trim()).filter(Boolean),
+          medications: form.medications.split(",").map((d) => d.trim()).filter(Boolean),
+          goals: form.goals.split(",").map((d) => d.trim()).filter(Boolean),
+          occupation: form.occupation || undefined,
+          targetCalories: form.targetCalories ? parseInt(form.targetCalories) : undefined,
+          targetProtein: form.targetProtein ? parseInt(form.targetProtein) : undefined,
+          targetCarbs: form.targetCarbs ? parseInt(form.targetCarbs) : undefined,
+          targetFat: form.targetFat ? parseInt(form.targetFat) : undefined,
+          targetWater: form.targetWater ? parseFloat(form.targetWater) : undefined,
         }),
       });
       if (res.ok) {
         setShowModal(false);
-        setForm({ name:"", email:"", password:"", age:"", height:"", weight:"", targetWeight:"", chronicDiseases:"" });
+        setForm({
+          name:"", email:"", password:"", phone:"",
+          gender:"", age:"", height:"", weight:"", targetWeight:"",
+          activityLevel:"moderate", chronicDiseases:"", allergies:"",
+          medications:"", goals:"", occupation:"",
+          targetCalories:"", targetProtein:"", targetCarbs:"",
+          targetFat:"", targetWater:"",
+        });
         fetchClients();
       }
     } finally { setCreating(false); }
+  };
+
+  /* ── Inactive clients ───────────────────────────── */
+  const fetchInactiveClients = useCallback(async () => {
+    setLoadingInactive(true);
+    try {
+      const res = await fetch("/api/dietitian/clients/inactive");
+      if (res.ok) setInactiveClients(await res.json());
+    } catch (e) { console.error(e); }
+    finally { setLoadingInactive(false); }
+  }, []);
+
+  const handleToggleInactive = () => {
+    if (!showInactive) fetchInactiveClients();
+    setShowInactive((v) => !v);
+  };
+
+  const handleActivate = async (id: string) => {
+    setActivating(id);
+    try {
+      const res = await fetch(`/api/dietitian/clients/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: true }),
+      });
+      if (res.ok) {
+        setInactiveClients((prev) => prev.filter((c) => c._id !== id));
+        fetchClients();
+      }
+    } finally { setActivating(null); }
+  };
+
+  /* ── Delete client ───────────────────────────────── */
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/dietitian/clients/${deleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setClients((prev) => prev.filter((c) => c._id !== deleteTarget.id));
+        setDeleteTarget(null);
+      }
+    } finally { setDeleting(false); }
   };
 
   /* ── Render ──────────────────────────────────────── */
@@ -374,12 +466,12 @@ export default function DietitianClientsPage() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 bg-white/85 backdrop-blur-sm border border-emerald-200/60 rounded-xl px-3 py-2.5 text-sm shadow-sm hover:border-emerald-300/80 transition-colors">
-            <FaSortAmountDown className="text-emerald-400" />
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+            <FaSortAmountDown className="text-emerald-400 shrink-0" />
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="bg-transparent text-gray-700 focus:outline-none text-sm appearance-none cursor-pointer"
+              className="bg-transparent text-gray-700 text-sm focus:outline-none cursor-pointer appearance-none"
             >
               <option value="name">Ad (A-Z)</option>
               <option value="progress">İlerleme (Yüksek)</option>
@@ -426,90 +518,322 @@ export default function DietitianClientsPage() {
                 key={client._id}
                 client={client}
                 onProfile={(id) => router.push(`/dashboard/dietitian/clients/${id}`)}
+                onDelete={(id, name) => setDeleteTarget({ id, name })}
               />
             ))}
           </div>
         )}
+        {/* Pasife Alınmış Danışanlar */}
+        <div className="border border-gray-200 rounded-2xl overflow-hidden">
+          <button
+            onClick={handleToggleInactive}
+            className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center">
+                <FaUserSlash className="text-gray-400 text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Pasife Alınmış Danışanlar</p>
+                <p className="text-xs text-gray-400">Kaldırılan danışanları görüntüle ve geri al</p>
+              </div>
+            </div>
+            {showInactive ? (
+              <FaChevronUp className="text-gray-400 text-sm shrink-0" />
+            ) : (
+              <FaChevronDown className="text-gray-400 text-sm shrink-0" />
+            )}
+          </button>
+
+          {showInactive && (
+            <div className="border-t border-gray-100 bg-gray-50">
+              {loadingInactive ? (
+                <div className="space-y-2 p-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 bg-gray-200 rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : inactiveClients.length === 0 ? (
+                <div className="flex items-center gap-3 px-5 py-6 text-gray-400">
+                  <FaUserSlash className="text-2xl text-gray-200" />
+                  <p className="text-sm">Pasife alınmış danışan yok</p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {inactiveClients.map((c) => (
+                    <li key={c._id} className="flex items-center gap-3 px-5 py-3">
+                      {c.image ? (
+                        <Image src={c.image} alt={c.name} width={36} height={36} className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-xl bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm shrink-0">
+                          {c.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">{c.name}</p>
+                        <p className="text-xs text-gray-400">{c.email}</p>
+                      </div>
+                      <button
+                        onClick={() => handleActivate(c._id)}
+                        disabled={activating === c._id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-semibold transition disabled:opacity-50 shrink-0"
+                      >
+                        <FaUserCheck className="text-[11px]" />
+                        {activating === c._id ? "..." : "Aktifleştir"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
+
+      {/* Delete Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                <FaExclamationTriangle className="text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">Danışanı Kaldır</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Bu işlem geri alınabilir</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600">
+              <span className="font-semibold text-gray-900">{deleteTarget.name}</span> adlı danışan listenizden kaldırılacak. Danışanın tüm verileri korunacak.
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition disabled:opacity-50"
+              >
+                {deleting ? "Kaldırılıyor..." : "Kaldır"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Client Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Yeni Danışan Ekle</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Danışan hesabı oluşturun</p>
+                <p className="text-xs text-gray-400 mt-0.5">Danışan profilini eksiksiz doldurun</p>
               </div>
               <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition text-gray-400">
                 <FaTimes />
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              {/* Personal info */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Kişisel Bilgiler
-                </label>
-                <div className="space-y-3">
-                  <input
-                    type="text" required placeholder="Ad Soyad" value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                  />
-                  <input
-                    type="email" required placeholder="E-posta" value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                  />
-                  <input
-                    type="password" required placeholder="Şifre" value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                  />
-                </div>
-              </div>
+            <form onSubmit={handleCreate} className="p-6 space-y-6">
 
-              {/* Body metrics */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Fiziksel Bilgiler
-                </label>
+              {/* ── Hesap Bilgileri ── */}
+              <section>
+                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest mb-3">Hesap Bilgileri</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Ad Soyad *</label>
+                    <input
+                      type="text" required placeholder="Ayşe Yılmaz" value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">E-posta *</label>
+                    <input
+                      type="email" required placeholder="ayse@email.com" value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Şifre *</label>
+                    <input
+                      type="password" required placeholder="••••••••" value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Telefon</label>
+                    <input
+                      type="tel" placeholder="0530 000 00 00" value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Meslek</label>
+                    <input
+                      type="text" placeholder="Öğretmen, Mühendis..." value={form.occupation}
+                      onChange={(e) => setForm({ ...form, occupation: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* ── Kişisel & Fiziksel ── */}
+              <section>
+                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest mb-3">Kişisel & Fiziksel Bilgiler</p>
+
+                {/* Cinsiyet */}
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-500 mb-2">Cinsiyet *</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { value: "female", label: "Kadın", emoji: "♀" },
+                      { value: "male", label: "Erkek", emoji: "♂" },
+                    ] as const).map(({ value, label, emoji }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setForm({ ...form, gender: value })}
+                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-medium transition ${
+                          form.gender === value
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                            : "border-gray-200 text-gray-500 hover:border-gray-300"
+                        }`}
+                      >
+                        <span className="text-base">{emoji}</span> {label}
+                      </button>
+                    ))}
+                  </div>
+                  {!form.gender && (
+                    <p className="text-[11px] text-gray-400 mt-1">BMR ve kalori hesabı için gereklidir</p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: "Yaş", field: "age", type: "number" },
-                    { label: "Boy (cm)", field: "height", type: "number" },
-                    { label: "Kilo (kg)", field: "weight", type: "number" },
-                    { label: "Hedef Kilo (kg)", field: "targetWeight", type: "number" },
-                  ].map(({ label, field, type }) => (
+                    { label: "Yaş *", field: "age", placeholder: "28", step: "1" },
+                    { label: "Boy (cm) *", field: "height", placeholder: "165", step: "1" },
+                    { label: "Mevcut Kilo (kg) *", field: "weight", placeholder: "72.5", step: "0.1" },
+                    { label: "Hedef Kilo (kg) *", field: "targetWeight", placeholder: "65.0", step: "0.1" },
+                  ].map(({ label, field, placeholder, step }) => (
                     <div key={field}>
                       <label className="block text-xs text-gray-500 mb-1">{label}</label>
                       <input
-                        type={type} required step="0.1"
-                        value={form[field as keyof typeof form]}
+                        type="number" required step={step} placeholder={placeholder}
+                        value={form[field as keyof typeof form] as string}
                         onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
                       />
                     </div>
                   ))}
                 </div>
-              </div>
 
-              {/* Chronic diseases */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Kronik Hastalıklar
-                </label>
-                <input
-                  type="text" placeholder="Diyabet, Hipertansiyon... (virgülle ayırın)"
-                  value={form.chronicDiseases}
-                  onChange={(e) => setForm({ ...form, chronicDiseases: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                />
-              </div>
+                {/* Aktivite Seviyesi */}
+                <div className="mt-3">
+                  <label className="block text-xs text-gray-500 mb-1">Aktivite Seviyesi</label>
+                  <select
+                    value={form.activityLevel}
+                    onChange={(e) => setForm({ ...form, activityLevel: e.target.value as typeof form.activityLevel })}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 bg-white"
+                  >
+                    <option value="sedentary">Hareketsiz — Masa başı iş, az egzersiz</option>
+                    <option value="light">Hafif Aktif — Haftada 1-3 gün egzersiz</option>
+                    <option value="moderate">Orta Aktif — Haftada 3-5 gün egzersiz</option>
+                    <option value="active">Aktif — Haftada 6-7 gün yoğun egzersiz</option>
+                    <option value="very_active">Çok Aktif — Günde iki antrenman veya ağır iş</option>
+                  </select>
+                </div>
+              </section>
 
-              <div className="flex gap-3 pt-2">
+              {/* ── Sağlık Bilgileri ── */}
+              <section>
+                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest mb-3">Sağlık Bilgileri</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Kronik Hastalıklar</label>
+                    <input
+                      type="text" placeholder="Diyabet Tip 2, Hipertansiyon... (virgülle ayırın)"
+                      value={form.chronicDiseases}
+                      onChange={(e) => setForm({ ...form, chronicDiseases: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Alerjiler & Gıda Hassasiyeti</label>
+                    <input
+                      type="text" placeholder="Glüten, Laktoz, Fıstık... (virgülle ayırın)"
+                      value={form.allergies}
+                      onChange={(e) => setForm({ ...form, allergies: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Kullanılan İlaçlar / Takviyeler</label>
+                    <input
+                      type="text" placeholder="Metformin, D3 vitamini... (virgülle ayırın)"
+                      value={form.medications}
+                      onChange={(e) => setForm({ ...form, medications: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Hedefler / Danışan Notları</label>
+                    <input
+                      type="text" placeholder="Kilo vermek, kas yapmak, sağlıklı beslenmek... (virgülle ayırın)"
+                      value={form.goals}
+                      onChange={(e) => setForm({ ...form, goals: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* ── Beslenme Hedefleri ── */}
+              <section>
+                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Beslenme Hedefleri</p>
+                <p className="text-[11px] text-gray-400 mb-3">Boş bırakılırsa sistem otomatik hesaplar</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Günlük Kalori Hedefi (kcal)</label>
+                    <input
+                      type="number" step="50" placeholder="1800"
+                      value={form.targetCalories}
+                      onChange={(e) => setForm({ ...form, targetCalories: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                    />
+                  </div>
+                  {[
+                    { label: "Protein (g)", field: "targetProtein", placeholder: "130" },
+                    { label: "Karbonhidrat (g)", field: "targetCarbs", placeholder: "200" },
+                    { label: "Yağ (g)", field: "targetFat", placeholder: "60" },
+                    { label: "Su Hedefi (L)", field: "targetWater", placeholder: "2.5" },
+                  ].map(({ label, field, placeholder }) => (
+                    <div key={field}>
+                      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+                      <input
+                        type="number" step="0.1" placeholder={placeholder}
+                        value={form[field as keyof typeof form] as string}
+                        onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <div className="flex gap-3 pt-2 sticky bottom-0 bg-white pb-1">
                 <button
                   type="button" onClick={() => setShowModal(false)}
                   className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
@@ -517,7 +841,7 @@ export default function DietitianClientsPage() {
                   İptal
                 </button>
                 <button
-                  type="submit" disabled={creating}
+                  type="submit" disabled={creating || !form.gender}
                   className="flex-1 py-3 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition disabled:opacity-50"
                 >
                   {creating ? "Oluşturuluyor..." : "Danışan Oluştur"}

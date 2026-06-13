@@ -27,6 +27,7 @@ export interface IClient extends Document {
   loginStreak?: number;
   lastLoginDate?: Date;
   totalPoints?: number;
+  isActive?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +64,7 @@ const ClientSchema = new Schema<IClient>(
     loginStreak: { type: Number, default: 0 },
     lastLoginDate: { type: Date },
     totalPoints: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true },
 );

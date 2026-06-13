@@ -15,6 +15,9 @@ interface ChatMessage {
   filename?: string;
   timestamp: string;
   status?: "sent" | "delivered" | "read";
+  editedAt?: string | null;
+  isDeleted?: boolean;
+  reactions?: { emoji: string; users: string[] }[];
 }
 
 interface ChatPartner {
@@ -223,6 +226,7 @@ export default function ClientMessagesPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content, type, filename }),
         });
+        fetchGroups();
       }
       fetchMessages();
     } catch (e) { console.error(e); }
@@ -238,6 +242,57 @@ export default function ClientMessagesPage() {
       });
     } catch { /* ignore */ }
   }, [selectedItem, dietitian]);
+
+  /* ── Edit / Delete message ─────────────────────── */
+  const handleEditMessage = useCallback(async (id: string, newContent: string) => {
+    if (!selectedItem) return;
+    try {
+      if (selectedItem.kind === "dietitian") {
+        await fetch(`/api/messages/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: newContent }),
+        });
+      } else {
+        await fetch(`/api/conversations/${selectedItem.data._id}/messages/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: newContent }),
+        });
+      }
+      setMessages((prev) =>
+        prev.map((m) => m._id === id ? { ...m, content: newContent, editedAt: new Date().toISOString() } : m)
+      );
+    } catch (e) { console.error(e); }
+  }, [selectedItem]);
+
+  const handleDeleteMessage = useCallback(async (id: string) => {
+    if (!selectedItem) return;
+    try {
+      if (selectedItem.kind === "dietitian") {
+        await fetch(`/api/messages/${id}`, { method: "DELETE" });
+      } else {
+        await fetch(`/api/conversations/${selectedItem.data._id}/messages/${id}`, { method: "DELETE" });
+      }
+      setMessages((prev) =>
+        prev.map((m) => m._id === id ? { ...m, isDeleted: true, content: "Bu mesaj geri alındı" } : m)
+      );
+    } catch (e) { console.error(e); }
+  }, [selectedItem]);
+
+  const handleReact = useCallback(async (msgId: string, emoji: string) => {
+    try {
+      const res = await fetch(`/api/messages/${msgId}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (res.ok) {
+        const { reactions } = await res.json();
+        setMessages((prev) => prev.map((m) => m._id === msgId ? { ...m, reactions } : m));
+      }
+    } catch (e) { console.error(e); }
+  }, []);
 
   /* ── Mark group read ───────────────────────────── */
   const markGroupRead = useCallback((groupId: string) => {
@@ -267,32 +322,47 @@ export default function ClientMessagesPage() {
   return (
     <div className="flex flex-col lg:flex-row h-screen">
       {/* Left panel */}
-      <div className="w-full lg:w-1/4 bg-white border-b lg:border-b-0 lg:border-r border-gray-100 flex flex-col">
+      <div className="w-full lg:w-1/4 flex flex-col" style={{ background: "linear-gradient(160deg, #7c3aed 0%, #6d28d9 55%, #0d9488 100%)" }}>
+        {/* Panel header */}
+        <div className="px-5 pt-5 pb-4 shrink-0">
+          <div className="flex items-center gap-3 mb-1.5">
+            <div className="w-9 h-9 bg-white/20 rounded-2xl flex items-center justify-center text-xl backdrop-blur-sm">
+              💬
+            </div>
+            <h1 className="text-white font-bold text-xl tracking-tight">Mesajlar</h1>
+          </div>
+          <p className="text-violet-200 text-xs leading-snug pl-0.5">Diyetisyeninizle bağlantıda kalın</p>
+        </div>
+
         {/* Tabs */}
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex rounded-lg bg-gray-100 p-0.5">
+        <div className="px-4 pb-4 shrink-0">
+          <div className="flex rounded-2xl p-1" style={{ background: "rgba(0,0,0,0.2)" }}>
             <button
               onClick={handleTabDietitian}
-              className={`flex-1 text-xs font-medium py-1.5 rounded-md transition ${
-                activeTab === "dietitian" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all duration-200 ${
+                activeTab === "dietitian"
+                  ? "bg-white text-violet-700 shadow-md"
+                  : "text-violet-100 hover:text-white hover:bg-white/10"
               }`}
             >
-              Diyetisyenim
+              👨‍⚕️ Diyetisyenim
             </button>
             <button
               onClick={handleTabGroups}
-              className={`flex-1 text-xs font-medium py-1.5 rounded-md transition flex items-center justify-center gap-1 ${
-                activeTab === "groups" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                activeTab === "groups"
+                  ? "bg-white text-violet-700 shadow-md"
+                  : "text-violet-100 hover:text-white hover:bg-white/10"
               }`}
             >
               <FaUsers className="text-[11px]" />
               Gruplar
               {groupUnreads.size > 0 ? (
-                <span className="bg-red-500 text-white text-[9px] font-bold rounded-full min-w-3.5 h-3.5 flex items-center justify-center px-1 leading-none">
+                <span className="bg-red-400 text-white text-[9px] font-bold rounded-full min-w-3.5 h-3.5 flex items-center justify-center px-1 leading-none">
                   {groupUnreads.size}
                 </span>
               ) : groups.length > 0 && (
-                <span className="bg-emerald-100 text-emerald-700 text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                <span className="bg-white/25 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none">
                   {groups.length}
                 </span>
               )}
@@ -300,97 +370,115 @@ export default function ClientMessagesPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {/* Dietitian tab */}
-          {activeTab === "dietitian" && (
-            <>
-              {dietitian ? (
-                <div
-                  className={`flex items-center gap-3 p-4 hover:bg-gray-50 transition cursor-pointer ${
-                    selectedItem?.kind === "dietitian" ? "bg-emerald-50" : ""
-                  }`}
-                  onClick={() => { setSelectedItem({ kind: "dietitian", data: dietitian }); markAsRead(dietitian._id); }}
-                >
-                  <div className="relative shrink-0">
-                    {dietitian.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={dietitian.image} alt={dietitian.name} className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 bg-emerald-200 rounded-full flex items-center justify-center text-emerald-700 font-bold text-sm">
-                        {dietitian.name.charAt(0)}
-                      </div>
-                    )}
-                    {unreadFromDietitian > 0 ? (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-4 h-4 flex items-center justify-center px-1 leading-none">
-                        {unreadFromDietitian > 99 ? "99+" : unreadFromDietitian}
-                      </span>
-                    ) : partnerPresence.online && selectedItem?.kind === "dietitian" ? (
-                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full" />
-                    ) : null}
-                  </div>
-                  <div>
-                    <p className={`text-sm truncate ${unreadFromDietitian > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-900"}`}>
-                      {dietitian.name}
-                    </p>
-                    {unreadFromDietitian > 0 ? (
-                      <p className="text-xs text-red-500 font-medium">{unreadFromDietitian} yeni mesaj</p>
-                    ) : (
-                      <p className="text-xs text-emerald-600">Diyetisyen</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 p-4">Henüz bir diyetisyen atanmamış.</p>
-              )}
-            </>
-          )}
-
-          {/* Groups tab */}
-          {activeTab === "groups" && (
-            <>
-              {groups.map((group) => {
-                const isSelected = selectedItem?.kind === "group" && selectedItem.data._id === group._id;
-                const unread = groupUnreads.get(group._id) ?? 0;
-                return (
+        {/* Content list — white card */}
+        <div className="flex-1 overflow-hidden flex flex-col bg-white rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]">
+          <div className="flex-1 overflow-y-auto">
+            {/* Dietitian tab */}
+            {activeTab === "dietitian" && (
+              <>
+                {dietitian ? (
                   <div
-                    key={group._id}
-                    className={`flex items-center gap-3 p-4 hover:bg-gray-50 transition cursor-pointer ${isSelected ? "bg-emerald-50" : ""}`}
-                    onClick={() => {
-                      setSelectedItem({ kind: "group", data: group });
-                      markGroupRead(group._id);
-                    }}
+                    className={`flex items-center gap-3.5 p-4 hover:bg-violet-50/70 transition-all cursor-pointer border-b border-gray-50 ${
+                      selectedItem?.kind === "dietitian" ? "bg-violet-50" : ""
+                    }`}
+                    onClick={() => { setSelectedItem({ kind: "dietitian", data: dietitian }); markAsRead(dietitian._id); }}
                   >
                     <div className="relative shrink-0">
-                      <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
-                        <FaUsers className="text-base" />
+                      <div className={`p-0.5 rounded-full ${unreadFromDietitian > 0 ? "bg-linear-to-br from-rose-200 to-red-300" : "bg-linear-to-br from-emerald-200 to-teal-300"}`}>
+                        {dietitian.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={dietitian.image} alt={dietitian.name} className="w-11 h-11 rounded-full object-cover ring-2 ring-white" />
+                        ) : (
+                          <div className="w-11 h-11 bg-linear-to-br from-emerald-300 to-teal-400 rounded-full flex items-center justify-center text-white font-bold text-base ring-2 ring-white">
+                            {dietitian.name.charAt(0)}
+                          </div>
+                        )}
                       </div>
-                      {unread > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-4 h-4 flex items-center justify-center px-1 leading-none">
-                          {unread > 99 ? "99+" : unread}
+                      {unreadFromDietitian > 0 ? (
+                        <span className="absolute -top-1 -right-1 bg-rose-400 text-white text-[9px] font-bold rounded-full min-w-4.5 h-4.5 flex items-center justify-center px-1 leading-none shadow-sm">
+                          {unreadFromDietitian > 99 ? "99+" : unreadFromDietitian}
                         </span>
-                      )}
+                      ) : partnerPresence.online && selectedItem?.kind === "dietitian" ? (
+                        <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-emerald-300 border-2 border-white rounded-full shadow-sm" />
+                      ) : null}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-sm truncate ${unread > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-700"}`}>
-                        {group.name}
+                      <p className={`text-sm truncate ${unreadFromDietitian > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}>
+                        {dietitian.name}
                       </p>
-                      {unread > 0 ? (
-                        <p className="text-xs text-red-500 font-medium">{unread} yeni mesaj</p>
+                      {unreadFromDietitian > 0 ? (
+                        <p className="text-xs text-rose-400 font-semibold mt-0.5 flex items-center gap-1">
+                          🔔 {unreadFromDietitian} yeni mesaj
+                        </p>
                       ) : (
-                        <p className="text-xs text-gray-400">{group.members.length} üye</p>
+                        <p className="text-xs text-emerald-500 font-medium mt-0.5 flex items-center gap-1">
+                          ✨ Diyetisyen
+                        </p>
                       )}
                     </div>
                   </div>
-                );
-              })}
-              {groups.length === 0 && (
-                <div className="text-center py-8 px-4">
-                  <FaUsers className="text-3xl text-gray-200 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400">Henüz bir gruba dahil değilsiniz.</p>
-                </div>
-              )}
-            </>
-          )}
+                ) : (
+                  <div className="text-center py-14 px-4">
+                    <div className="text-5xl mb-3">👨‍⚕️</div>
+                    <p className="text-sm font-semibold text-gray-500">Henüz bir diyetisyen atanmamış.</p>
+                    <p className="text-xs text-gray-400 mt-1">Yakında bağlanacaksınız!</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Groups tab */}
+            {activeTab === "groups" && (
+              <>
+                {[...groups]
+                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                  .map((group) => {
+                  const isSelected = selectedItem?.kind === "group" && selectedItem.data._id === group._id;
+                  const unread = groupUnreads.get(group._id) ?? 0;
+                  return (
+                    <div
+                      key={group._id}
+                      className={`flex items-center gap-3.5 p-4 hover:bg-emerald-50/60 transition-all cursor-pointer border-b border-gray-50 ${isSelected ? "bg-emerald-50" : ""}`}
+                      onClick={() => {
+                        setSelectedItem({ kind: "group", data: group });
+                        markGroupRead(group._id);
+                      }}
+                    >
+                      <div className="relative shrink-0">
+                        <div className={`w-11 h-11 rounded-full flex items-center justify-center text-lg shadow-sm ${unread > 0 ? "bg-rose-100 text-rose-400" : "bg-emerald-100 text-emerald-500"}`}>
+                          👥
+                        </div>
+                        {unread > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-rose-400 text-white text-[9px] font-bold rounded-full min-w-4.5 h-4.5 flex items-center justify-center px-1 leading-none shadow-sm">
+                            {unread > 99 ? "99+" : unread}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm truncate ${unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}>
+                          {group.name}
+                        </p>
+                        {unread > 0 ? (
+                          <p className="text-xs text-rose-400 font-semibold mt-0.5 flex items-center gap-1">
+                            🔔 {unread} yeni mesaj
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-400 mt-0.5">{group.members.length} üye</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {groups.length === 0 && (
+                  <div className="text-center py-14 px-4">
+                    <div className="text-5xl mb-3">🤝</div>
+                    <p className="text-sm font-semibold text-gray-500">Henüz bir gruba dahil değilsiniz.</p>
+                    <p className="text-xs text-gray-400 mt-1">Diyetisyeniniz sizi ekleyecektir.</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -398,6 +486,7 @@ export default function ClientMessagesPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {selectedItem ? (
           <ChatWindow
+            key={selectedItem.data._id}
             messages={messages}
             currentUserId={session?.user?.id || ""}
             onSendMessage={handleSendMessage}
@@ -410,10 +499,23 @@ export default function ClientMessagesPage() {
             onFileUpload={handleFileUpload}
             isGroup={selectedItem.kind === "group"}
             groupMemberCount={selectedItem.kind === "group" ? selectedItem.data.members.length : undefined}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={handleDeleteMessage}
+            onReact={handleReact}
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-            {activeTab === "groups" ? "Sol panelden bir grup seçin." : "Mesajlaşmak için bir diyetisyen ataması gerekiyor."}
+          <div className="flex flex-col items-center justify-center h-full gap-4 select-none" style={{ background: "radial-gradient(ellipse at center, #f0fdf4 0%, #f8fafc 70%)" }}>
+            <div className="text-6xl animate-bounce" style={{ animationDuration: "2.5s" }}>
+              {activeTab === "groups" ? "👥" : "💬"}
+            </div>
+            <div className="text-center">
+              <p className="text-gray-600 font-semibold text-base">
+                {activeTab === "groups" ? "Bir grup seçin" : "Sohbete başlayın"}
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                {activeTab === "groups" ? "Sol panelden bir grubu seçin." : "Diyetisyeninizle mesajlaşmaya başlayın."}
+              </p>
+            </div>
           </div>
         )}
       </div>

@@ -14,19 +14,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
     }
 
-    const { name, email, password, age, height, weight, targetWeight, chronicDiseases } =
-      await request.json();
+    const {
+      name, email, password, phone, gender,
+      age, height, weight, targetWeight, activityLevel,
+      chronicDiseases, allergies, medications, goals,
+      targetCalories, targetProtein, targetCarbs, targetFat, targetWater,
+      occupation,
+    } = await request.json();
 
-    if (!name || !email || !password || !age || !height || !weight || !targetWeight) {
+    if (!name || !email || !password || !age || !height || !weight || !targetWeight || !gender) {
       return NextResponse.json(
-        { error: "Tüm alanlar gereklidir" },
+        { error: "Zorunlu alanları doldurun" },
         { status: 400 }
       );
     }
 
     await dbConnect();
 
-    // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return NextResponse.json(
@@ -35,16 +39,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create user account for the client
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
       role: "client",
+      phone: phone || undefined,
+      gender: gender || undefined,
     });
 
-    // Create client profile
     const client = await Client.create({
       userId: user._id,
       dietitianId: session.user.id,
@@ -53,7 +57,19 @@ export async function POST(request: Request) {
       weight,
       targetWeight,
       startWeight: weight,
+      gender: gender || undefined,
+      activityLevel: activityLevel || "moderate",
       chronicDiseases: chronicDiseases || [],
+      allergies: allergies || [],
+      medications: medications || [],
+      goals: goals || [],
+      occupation: occupation || undefined,
+      phone: phone || undefined,
+      targetCalories: targetCalories || undefined,
+      targetProtein: targetProtein || undefined,
+      targetCarbs: targetCarbs || undefined,
+      targetFat: targetFat || undefined,
+      targetWater: targetWater || undefined,
     });
 
     return NextResponse.json(

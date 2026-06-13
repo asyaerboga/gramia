@@ -4,6 +4,26 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Appointment from "@/lib/models/Appointment";
 import Client from "@/lib/models/Client";
+import Notification from "@/lib/models/Notification";
+import { Types } from "mongoose";
+
+async function createAppointmentNotification(
+  clientId: Types.ObjectId,
+  appointmentId: Types.ObjectId,
+  type: string,
+  title: string,
+  message: string
+) {
+  try {
+    const client = await Client.findById(clientId);
+    if (!client) return;
+    await Notification.create({ userId: client.userId, type, title, message, appointmentId, isRead: false });
+  } catch { /* bildirim oluşturulamazsa sessizce devam et */ }
+}
+
+function formatAppointmentDate(date: Date, time: string) {
+  return `${new Date(date).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })} saat ${time}`;
+}
 
 // GET /api/dietitian/appointments - Get all appointments for the dietitian
 export async function GET(request: NextRequest) {
@@ -129,12 +149,55 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    const oldStatus = appointment.status;
+    const oldDate = appointment.date;
+    const oldTime = appointment.time;
+
     if (status) appointment.status = status;
     if (date) appointment.date = new Date(date);
     if (time) appointment.time = time;
     if (notes !== undefined) appointment.notes = notes;
 
     await appointment.save();
+
+    const aptDate = formatAppointmentDate(appointment.date, appointment.time);
+
+    // İptal durumunda danışanın eski bildirimlerini temizle (yeni bildirim gelmeden önce)
+    if (status === "cancelled" && status !== oldStatus) {
+      const clientForClear = await Client.findById(appointment.clientId);
+      if (clientForClear) {
+        await Notification.updateMany(
+          { appointmentId: appointment._id, userId: clientForClear.userId, isRead: false },
+          { $set: { isRead: true } }
+        ).catch(() => {});
+      }
+    }
+
+    if (status && status !== oldStatus) {
+      const notifMap: Record<string, { type: string; title: string }> = {
+        confirmed: { type: "appointment_confirmed",  title: "Randevunuz Onaylandı ✅" },
+        cancelled: { type: "appointment_cancelled",  title: "Randevunuz İptal Edildi ❌" },
+        completed: { type: "appointment_completed",  title: "Randevunuz Tamamlandı 🎉" },
+      };
+      const notif = notifMap[status] ?? { type: "appointment_status_changed", title: "Randevu Durumu Güncellendi" };
+      await createAppointmentNotification(
+        appointment.clientId,
+        appointment._id as Types.ObjectId,
+        notif.type,
+        notif.title,
+        `${aptDate} tarihli randevunuzun durumu güncellendi.`
+      );
+    }
+    if ((date && new Date(date).toISOString() !== oldDate.toISOString()) || (time && time !== oldTime)) {
+      await createAppointmentNotification(
+        appointment.clientId,
+        appointment._id as Types.ObjectId,
+        "appointment_time_changed",
+        "Randevu Tarihiniz Değiştirildi 📅",
+        `Randevunuz ${aptDate} olarak güncellendi.`
+      );
+    }
+
     return NextResponse.json({ message: "Güncellendi", appointment });
   } catch (error) {
     console.error("PATCH dietitian appointment error:", error);

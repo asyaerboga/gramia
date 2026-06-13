@@ -11,8 +11,17 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+function groupReactions(raw: { emoji: string; userId: string }[]): { emoji: string; users: string[] }[] {
+  const map = new Map<string, string[]>();
+  for (const r of raw || []) {
+    if (!map.has(r.emoji)) map.set(r.emoji, []);
+    map.get(r.emoji)!.push(r.userId);
+  }
+  return Array.from(map.entries()).map(([emoji, users]) => ({ emoji, users }));
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function serializeMessage(m: any, id: string, lastSeenAt: Map<string, Date>, members: { id: string; name: string; image: string | null }[]) {
+function serializeMessage(m: any, id: string, lastSeenAt: Map<string, Date> = new Map(), members: { id: string; name: string; image: string | null }[] = []) {
   const sender = m.senderId;
   const senderId =
     sender && typeof sender === "object" && sender._id
@@ -38,7 +47,10 @@ function serializeMessage(m: any, id: string, lastSeenAt: Map<string, Date>, mem
     filename: m.filename,
     timestamp: m.timestamp,
     status: m.status,
+    editedAt: m.editedAt ?? null,
+    isDeleted: m.isDeleted ?? false,
     seenBy,
+    reactions: groupReactions(m.reactions || []),
   };
 }
 

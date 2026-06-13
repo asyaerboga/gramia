@@ -17,10 +17,11 @@ export async function GET() {
 
     await dbConnect();
 
-    const clients = await Client.find({ dietitianId: session.user.id }).populate(
+    const allClients = await Client.find({ dietitianId: session.user.id }).populate(
       "userId",
       "name email image"
     );
+    const clients = allClients.filter((c) => c.isActive !== false);
 
     // Get today's calories for each client
     const today = new Date();

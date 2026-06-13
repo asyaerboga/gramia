@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/components/providers/ToastProvider";
 
 const dietitianNavItems = [
-  { href: "/dashboard/dietitian",              icon: <FaHome />,        label: "Dashboard",  exact: true },
+  { href: "/dashboard/dietitian",              icon: <FaHome />,        label: "Ana Sayfa",  exact: true },
   { href: "/dashboard/dietitian/clients",      icon: <FaUsers />,       label: "Danışanlar" },
   { href: "/dashboard/dietitian/appointments", icon: <FaCalendarAlt />, label: "Randevular" },
   { href: "/dashboard/dietitian/messages",     icon: <FaComments />,    label: "Mesaj" },
@@ -36,8 +36,10 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [appointmentNotifCount, setAppointmentNotifCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const prevSendersRef = useRef<Map<string, number>>(new Map());
+  const prevAppointmentNotifsRef = useRef(0);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -46,6 +48,26 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
     const id = setInterval(ping, 30_000);
     return () => clearInterval(id);
   }, []);
+
+  const fetchAppointmentNotifs = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) return;
+      const notifs: { _id: string; title: string; message: string }[] = await res.json();
+      if (notifs.length > prevAppointmentNotifsRef.current) {
+        const newest = notifs[0];
+        showToast("info", `🔔 ${newest.title}`, newest.message, 8000);
+      }
+      prevAppointmentNotifsRef.current = notifs.length;
+      setAppointmentNotifCount(notifs.length);
+    } catch { /* ignore */ }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchAppointmentNotifs();
+    const interval = setInterval(fetchAppointmentNotifs, 15_000);
+    return () => clearInterval(interval);
+  }, [fetchAppointmentNotifs]);
 
   const fetchUnread = useCallback(async () => {
     try {
@@ -132,11 +154,19 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
               ? pathname === item.href
               : pathname === item.href || pathname.startsWith(item.href + "/");
             const isMessages = item.href === "/dashboard/dietitian/messages";
+            const isAppointments = item.href === "/dashboard/dietitian/appointments";
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => {
+                  setSidebarOpen(false);
+                  if (isAppointments && appointmentNotifCount > 0) {
+                    fetch("/api/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).catch(() => {});
+                    setAppointmentNotifCount(0);
+                    prevAppointmentNotifsRef.current = 0;
+                  }
+                }}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${
                   isActive
                     ? "bg-emerald-200/60 text-emerald-800 shadow-sm"
@@ -150,6 +180,11 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
                 {isMessages && unreadCount > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+                {isAppointments && appointmentNotifCount > 0 && (
+                  <span className="ml-auto bg-orange-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {appointmentNotifCount > 99 ? "99+" : appointmentNotifCount}
                   </span>
                 )}
               </Link>
