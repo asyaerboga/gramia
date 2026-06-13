@@ -451,7 +451,7 @@ export default function DietitianMessagesPage() {
   const toggleMember = (id: string) => {
     setSelectedMemberIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   };
@@ -472,7 +472,7 @@ export default function DietitianMessagesPage() {
   return (
     <div className="flex flex-col lg:flex-row h-screen">
       {/* Left panel */}
-      <div className="w-full lg:w-1/4 flex flex-col" style={{ background: "linear-gradient(160deg, #4f46e5 0%, #4338ca 55%, #0d9488 100%)" }}>
+      <div className="w-full lg:w-1/4 flex flex-col" style={{ background: "linear-gradient(160deg, #34d399 0%, #10b981 55%, #059669 100%)" }}>
         {/* Panel header */}
         <div className="px-5 pt-5 pb-4 shrink-0">
           <div className="flex items-center gap-3 mb-1.5">
@@ -481,7 +481,7 @@ export default function DietitianMessagesPage() {
             </div>
             <h1 className="text-white font-bold text-xl tracking-tight">Mesajlar</h1>
           </div>
-          <p className="text-indigo-200 text-xs leading-snug pl-0.5">Danışanlarınızla bağlantıda kalın</p>
+          <p className="text-emerald-100 text-xs leading-snug pl-0.5">Danışanlarınızla bağlantıda kalın</p>
         </div>
 
         {/* Search + new group */}
@@ -492,7 +492,7 @@ export default function DietitianMessagesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={activeTab === "clients" ? "Danışan ara..." : "Grup ara..."}
-              className="flex-1 px-3 py-2 bg-white/15 border border-white/20 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-white/40 text-white placeholder:text-indigo-200 backdrop-blur-sm"
+              className="flex-1 px-3 py-2 bg-white/15 border border-white/20 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-white/40 text-white placeholder:text-emerald-100 backdrop-blur-sm"
             />
             <button
               onClick={() => setShowCreateModal(true)}
@@ -504,11 +504,11 @@ export default function DietitianMessagesPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex rounded-2xl p-1" style={{ background: "rgba(0,0,0,0.2)" }}>
+          <div className="flex rounded-2xl p-1" style={{ background: "rgba(0,0,0,0.15)" }}>
             <button
               onClick={() => setActiveTab("clients")}
               className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all duration-200 ${
-                activeTab === "clients" ? "bg-white text-indigo-700 shadow-md" : "text-indigo-100 hover:text-white hover:bg-white/10"
+                activeTab === "clients" ? "bg-white text-emerald-700 shadow-md" : "text-emerald-100 hover:text-white hover:bg-white/10"
               }`}
             >
               Danışanlar
@@ -516,7 +516,7 @@ export default function DietitianMessagesPage() {
             <button
               onClick={() => setActiveTab("groups")}
               className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all duration-200 flex items-center justify-center gap-1 ${
-                activeTab === "groups" ? "bg-white text-indigo-700 shadow-md" : "text-indigo-100 hover:text-white hover:bg-white/10"
+                activeTab === "groups" ? "bg-white text-emerald-700 shadow-md" : "text-emerald-100 hover:text-white hover:bg-white/10"
               }`}
             >
               <FaUsers className="text-[11px]" />
@@ -546,7 +546,7 @@ export default function DietitianMessagesPage() {
                 return (
                   <div
                     key={client._id}
-                    className={`flex items-center gap-3 p-4 hover:bg-indigo-50/70 transition cursor-pointer border-b border-gray-50 ${isSelected ? "bg-indigo-50" : ""}`}
+                    className={`flex items-center gap-3 p-4 hover:bg-emerald-50/70 transition cursor-pointer border-b border-gray-50 ${isSelected ? "bg-emerald-50" : ""}`}
                     onClick={() => { setSelectedItem({ kind: "client", data: client }); markAsRead(client._id); }}
                   >
                     <div className="relative shrink-0">
@@ -554,7 +554,7 @@ export default function DietitianMessagesPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={client.image} alt={client.name} className="w-10 h-10 rounded-full object-cover" />
                       ) : (
-                        <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold text-sm">
                           {client.name.charAt(0)}
                         </div>
                       )}
@@ -563,7 +563,7 @@ export default function DietitianMessagesPage() {
                           {unread > 99 ? "99+" : unread}
                         </span>
                       ) : clientPresences.get(client._id)?.online ? (
-                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-indigo-400 border-2 border-white rounded-full" />
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full" />
                       ) : null}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -573,7 +573,7 @@ export default function DietitianMessagesPage() {
                       {unread > 0 ? (
                         <p className="text-xs text-red-500 font-medium">{unread} yeni mesaj</p>
                       ) : (
-                        <p className={`text-xs font-medium ${clientPresences.get(client._id)?.online ? "text-indigo-500" : "text-gray-400"}`}>
+                        <p className={`text-xs font-medium ${clientPresences.get(client._id)?.online ? "text-emerald-500" : "text-gray-400"}`}>
                           {clientPresences.get(client._id)?.online ? "Çevrimiçi" : "Çevrimdışı"}
                         </p>
                       )}
@@ -604,7 +604,7 @@ export default function DietitianMessagesPage() {
                 return (
                   <div
                     key={group._id}
-                    className={`flex items-center gap-3 p-4 hover:bg-indigo-50/70 transition cursor-pointer border-b border-gray-50 ${isSelected ? "bg-indigo-50" : ""}`}
+                    className={`flex items-center gap-3 p-4 hover:bg-emerald-50/70 transition cursor-pointer border-b border-gray-50 ${isSelected ? "bg-emerald-50" : ""}`}
                     onClick={() => {
                       setSelectedItem({ kind: "group", data: group });
                       markGroupRead(group._id);

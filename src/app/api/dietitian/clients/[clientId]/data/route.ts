@@ -42,8 +42,14 @@ export async function GET(
       );
     }
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const startDateParam = url.searchParams.get("startDate");
+    const endDateParam = url.searchParams.get("endDate");
+
+    const endDate = endDateParam ? new Date(endDateParam) : new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    const startDate = startDateParam ? new Date(startDateParam) : new Date();
+    if (!startDateParam) startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
 
     const result: Record<string, unknown> = {};
@@ -52,7 +58,7 @@ export async function GET(
     if (category === "all" || category === "exercises") {
       const exercises = await Exercise.find({
         clientId,
-        date: { $gte: startDate },
+        date: { $gte: startDate, $lte: endDate },
       }).sort({ date: -1 });
 
       const totalMinutes = exercises.reduce((sum, e) => sum + e.duration, 0);
@@ -90,17 +96,17 @@ export async function GET(
     if (category === "all" || category === "wellness") {
       const sleepRecords = await Sleep.find({
         clientId,
-        date: { $gte: startDate },
+        date: { $gte: startDate, $lte: endDate },
       }).sort({ date: -1 });
 
       const checkIns = await CheckIn.find({
         clientId,
-        date: { $gte: startDate },
+        date: { $gte: startDate, $lte: endDate },
       }).sort({ date: -1 });
 
       const waterIntakes = await WaterIntake.find({
         clientId,
-        date: { $gte: startDate },
+        date: { $gte: startDate, $lte: endDate },
       }).sort({ date: -1 });
 
       // Sleep summary
@@ -152,16 +158,17 @@ export async function GET(
     if (category === "all" || category === "meals") {
       const meals = await Meal.find({
         clientId,
-        date: { $gte: startDate },
+        date: { $gte: startDate, $lte: endDate },
       }).sort({ date: -1 });
 
       const satietyRecords = await MealSatiety.find({
         clientId,
-        date: { $gte: startDate },
+        date: { $gte: startDate, $lte: endDate },
       }).sort({ date: -1 });
 
       const totalCalories = meals.reduce((sum, m) => sum + m.totalCalories, 0);
-      const avgCaloriesPerDay = meals.length > 0 ? totalCalories / days : 0;
+      const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      const avgCaloriesPerDay = totalCalories > 0 ? totalCalories / dayCount : 0;
 
       // Group by meal type
       const byType: Record<string, { count: number; calories: number }> = {};

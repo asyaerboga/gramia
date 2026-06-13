@@ -2,13 +2,28 @@ import { NextResponse } from "next/server";
 
 const TENOR_KEY = process.env.TENOR_API_KEY || "LIVDSRZULELA";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseResults(data: any) {
-  return (data.results || []).map((item: any) => ({
-    id: item.id as string,
-    url: (item.media?.[0]?.gif?.url || "") as string,
-    preview: (item.media?.[0]?.tinygif?.url || item.media?.[0]?.nanogif?.url || item.media?.[0]?.gif?.url || "") as string,
-    title: (item.title || "") as string,
+interface TenorMedia {
+  gif?: { url?: string };
+  tinygif?: { url?: string };
+  nanogif?: { url?: string };
+}
+
+interface TenorResult {
+  id: string;
+  media?: TenorMedia[];
+  title?: string;
+}
+
+interface TenorResponse {
+  results?: TenorResult[];
+}
+
+function parseResults(data: TenorResponse) {
+  return (data.results || []).map((item) => ({
+    id: item.id,
+    url: item.media?.[0]?.gif?.url || "",
+    preview: item.media?.[0]?.tinygif?.url || item.media?.[0]?.nanogif?.url || item.media?.[0]?.gif?.url || "",
+    title: item.title || "",
   }));
 }
 

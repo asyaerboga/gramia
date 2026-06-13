@@ -233,10 +233,10 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-emerald-50/30 to-teal-50/20 p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           <div className="animate-pulse space-y-6">
-            <div className="h-12 bg-gray-200 rounded-lg w-1/3" />
+            <div className="h-32 bg-emerald-200/50 rounded-3xl" />
             <div className="h-96 bg-gray-200 rounded-2xl" />
           </div>
         </div>
@@ -245,31 +245,36 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <FaCog className="text-gray-500" />
-              Ayarlar
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Profil bilgilerinizi yönetin
-            </p>
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-emerald-50/30 to-teal-50/20 p-4 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-4">
+        {/* Hero Banner */}
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-emerald-600 via-teal-500 to-cyan-400 p-6 text-white shadow-xl shadow-emerald-200">
+          <div className="absolute -top-8 -right-8 w-48 h-48 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute -bottom-10 -left-6 w-40 h-40 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute top-4 right-32 w-6 h-6 bg-white/20 rounded-full" />
+          <div className="absolute bottom-6 right-16 w-3 h-3 bg-white/30 rounded-full" />
+
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-4xl drop-shadow-lg">⚙️</span>
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Ayarlar</h1>
+              </div>
+              <p className="text-emerald-100 text-sm mt-1 font-medium">Profil bilgilerinizi yönetin</p>
+            </div>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white/20 border border-white/30 text-white rounded-xl hover:bg-white/30 transition backdrop-blur-sm disabled:opacity-50 font-semibold text-sm shrink-0"
+            >
+              <FaSave />
+              {saving ? "Kaydediliyor..." : "Kaydet"}
+            </button>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-6 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition disabled:opacity-50"
-          >
-            <FaSave />
-            {saving ? "Kaydediliyor..." : "Kaydet"}
-          </button>
         </div>
 
         {/* Profile Photo */}
-        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 mb-4">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-900 mb-4">Profil Fotoğrafı</h2>
           <div className="flex items-center gap-5">
             <div className="relative shrink-0">
@@ -328,7 +333,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Password Change */}
-        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 mb-4">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <FaLock className="text-emerald-500" />
             Şifre Değiştir

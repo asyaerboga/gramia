@@ -106,7 +106,8 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
   }, [showToast]);
 
   useEffect(() => {
-    fetchUnread();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchUnread();
     const interval = setInterval(fetchUnread, 5000);
     return () => clearInterval(interval);
   }, [fetchUnread]);
@@ -144,7 +145,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
         fixed left-0 top-0 h-screen flex flex-col z-30
         w-64 lg:w-1/5
         transition-transform duration-300 ease-in-out
-        bg-gradient-to-b from-emerald-50 via-teal-50/60 to-emerald-50/40
+        bg-linear-to-b from-emerald-50 via-teal-50/60 to-emerald-50/40
         border-r border-emerald-100/80 shadow-md
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
@@ -177,7 +178,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
                 </span>
                 <span className="truncate">{item.label}</span>
                 {isMessages && unreadCount > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shrink-0">
+                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-4.5 h-4.5 flex items-center justify-center px-1 shrink-0">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}

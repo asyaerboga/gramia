@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Client from "@/lib/models/Client";
-import User from "@/lib/models/User";
 import Meal from "@/lib/models/Meal";
 import Measurement from "@/lib/models/Measurement";
 

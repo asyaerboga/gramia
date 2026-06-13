@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 interface MannequinChartProps {
   regions: {
@@ -92,9 +93,11 @@ export default function MannequinChart({ regions }: MannequinChartProps) {
 
       <div className="relative mx-auto" style={{ width: W, height: H }}>
         {/* Body image */}
-        <img
+        <Image
           src={view === "front" ? "/front.svg" : "/back.svg"}
           alt={view === "front" ? "Ön görünüm" : "Arka görünüm"}
+          width={imgW}
+          height={imgH}
           className="absolute select-none pointer-events-none"
           draggable={false}
           style={{
@@ -103,6 +106,7 @@ export default function MannequinChart({ regions }: MannequinChartProps) {
             width: imgW,
             height: imgH,
           }}
+          unoptimized
         />
 
         {/* SVG overlay for measurement lines and dots */}

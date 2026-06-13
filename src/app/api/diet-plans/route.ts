@@ -19,8 +19,7 @@ export async function GET(request: Request) {
     const clientId = searchParams.get("clientId");
     const activeOnly = searchParams.get("activeOnly") === "true";
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query: any = {};
+    const query: Record<string, unknown> = {};
 
     if (session.user.role === "dietitian") {
       // Diyetisyen tüm kendi planlarını görebilir

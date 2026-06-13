@@ -332,18 +332,37 @@ export default function WellnessPage() {
     <div className="min-h-screen p-4 md:p-6" style={{ background: "linear-gradient(150deg,#eef2ff 0%,#faf5ff 55%,#ecfdf5 100%)" }}>
       <div className="max-w-6xl mx-auto">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-              <span className="text-2xl">✨</span>
-              <span className="bg-linear-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                Sağlık & Uyku Takibi
-              </span>
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">Günlük durumunuzu ve uykunuzu takip edin</p>
+        {/* ── Hero Banner ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-indigo-600 via-violet-600 to-teal-500 p-6 text-white shadow-xl shadow-indigo-200 mb-6">
+          <div className="absolute -top-8 -right-8 w-48 h-48 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute -bottom-10 -left-6 w-40 h-40 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute top-4 right-32 w-6 h-6 bg-white/20 rounded-full" />
+          <div className="absolute bottom-6 right-16 w-3 h-3 bg-white/30 rounded-full" />
+
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-4xl drop-shadow-lg">✨</span>
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Sağlık & Uyku</h1>
+              </div>
+              <p className="text-indigo-200 text-sm mt-1 font-medium">Günlük durumunuzu ve uykunuzu takip edin</p>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-center border border-white/20">
+                <p className="text-xl leading-none mb-0.5">{checkIn ? moodEmojis[checkIn.mood - 1] : "—"}</p>
+                <p className="text-xs text-indigo-200 font-medium">Ruh hali</p>
+              </div>
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-center border border-white/20">
+                <p className="text-xl font-bold leading-none mb-0.5">{sleep ? `${sleep.duration}s` : "—"}</p>
+                <p className="text-xs text-indigo-200 font-medium">Uyku</p>
+              </div>
+            </div>
           </div>
-          <DatePickerModern value={selectedDate} onChange={setSelectedDate} max={getLocalDateStr()} />
+
+          <div className="relative z-10 mt-5">
+            <DatePickerModern value={selectedDate} onChange={setSelectedDate} max={getLocalDateStr()} />
+          </div>
         </div>
 
         {/* Segment control tabs */}

@@ -64,7 +64,8 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
   }, [showToast]);
 
   useEffect(() => {
-    fetchAppointmentNotifs();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchAppointmentNotifs();
     const interval = setInterval(fetchAppointmentNotifs, 15_000);
     return () => clearInterval(interval);
   }, [fetchAppointmentNotifs]);
@@ -99,7 +100,8 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
   }, [showToast]);
 
   useEffect(() => {
-    fetchUnread();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchUnread();
     const interval = setInterval(fetchUnread, 5000);
     return () => clearInterval(interval);
   }, [fetchUnread]);
@@ -137,7 +139,7 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
         fixed left-0 top-0 h-screen flex flex-col z-30
         w-64 lg:w-1/5
         transition-transform duration-300 ease-in-out
-        bg-gradient-to-b from-emerald-50 via-teal-50/60 to-emerald-50/40
+        bg-linear-to-b from-emerald-50 via-teal-50/60 to-emerald-50/40
         border-r border-emerald-100/80 shadow-md
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
@@ -178,12 +180,12 @@ export default function DietitianLayout({ children }: { children: ReactNode }) {
                 </span>
                 <span>{item.label}</span>
                 {isMessages && unreadCount > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-4.5 h-4.5 flex items-center justify-center px-1">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
                 {isAppointments && appointmentNotifCount > 0 && (
-                  <span className="ml-auto bg-orange-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  <span className="ml-auto bg-orange-500 text-white text-[10px] font-bold rounded-full min-w-4.5 h-4.5 flex items-center justify-center px-1">
                     {appointmentNotifCount > 99 ? "99+" : appointmentNotifCount}
                   </span>
                 )}

@@ -1,5 +1,5 @@
 "use client";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export interface SelectOption {
@@ -91,7 +91,7 @@ export default function SelectModern({
       <button
         ref={triggerRef}
         type="button"
-        onMouseDown={(e) => { e.stopPropagation(); open ? setOpen(false) : handleOpen(); }}
+        onMouseDown={(e) => { e.stopPropagation(); if (open) { setOpen(false); } else { handleOpen(); } }}
         className={`dropdown-trigger inline-flex items-center gap-2 px-3.5 py-2 ${open ? "open" : ""} ${className}`}
       >
         {icon && <span className="text-emerald-400 shrink-0">{icon}</span>}

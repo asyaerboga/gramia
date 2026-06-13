@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FaTrophy, FaLock, FaStar, FaMedal } from "react-icons/fa";
+import { FaTrophy, FaLock, FaStar } from "react-icons/fa";
 import { useToast } from "@/components/providers/ToastProvider";
 
 interface Achievement {
@@ -111,16 +111,13 @@ export default function AchievementsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-12 bg-gray-200 rounded-lg w-2/3 md:w-1/3" />
-            <div className="h-32 bg-gray-200 rounded-2xl" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-40 bg-gray-200 rounded-xl" />
-              ))}
-            </div>
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-amber-50/30 to-orange-50/20 p-4 md:p-6">
+        <div className="max-w-6xl mx-auto space-y-5">
+          <div className="animate-pulse h-44 bg-amber-200/40 rounded-3xl" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-40 bg-gray-200 rounded-xl" />
+            ))}
           </div>
         </div>
       </div>
@@ -128,61 +125,51 @@ export default function AchievementsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FaTrophy className="text-amber-500" />
-            Rozetler & Başarılar
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            İlerlemeni takip et ve rozetler kazan
-          </p>
-        </div>
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-amber-50/30 to-orange-50/20 p-4 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-5">
+        {/* Hero Banner */}
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-amber-500 via-orange-400 to-yellow-400 p-6 text-white shadow-xl shadow-amber-200">
+          {/* Dekoratif daireler */}
+          <div className="absolute -top-8 -right-8 w-48 h-48 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute -bottom-10 -left-6 w-40 h-40 bg-white/10 rounded-full blur-sm" />
+          <div className="absolute top-4 right-32 w-6 h-6 bg-white/20 rounded-full" />
+          <div className="absolute bottom-6 right-16 w-3 h-3 bg-white/30 rounded-full" />
 
-        {/* Stats Card */}
-        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-gray-100 mb-6">
-          <div className="grid grid-cols-3 gap-3 md:gap-6 mb-6">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg shadow-amber-200">
-                <FaTrophy className="text-white text-2xl" />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-4xl drop-shadow-lg">🏆</span>
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Rozetler & Başarılar</h1>
               </div>
-              <p className="text-2xl font-bold text-gray-900">
-                {unlockedCount}
-              </p>
-              <p className="text-sm text-gray-500">Rozet Kazanıldı</p>
+              <p className="text-amber-100 text-sm mt-1 font-medium">İlerlemeni takip et ve rozetler kazan</p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg shadow-purple-200">
-                <FaStar className="text-white text-2xl" />
+
+            <div className="flex gap-3 shrink-0">
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-center border border-white/20">
+                <p className="text-2xl font-bold">{unlockedCount}</p>
+                <p className="text-xs text-amber-100 font-medium">Rozet</p>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{totalPoints}</p>
-              <p className="text-sm text-gray-500">Toplam Puan</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-500 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg shadow-emerald-200">
-                <FaMedal className="text-white text-2xl" />
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-center border border-white/20">
+                <p className="text-2xl font-bold">{totalPoints}</p>
+                <p className="text-xs text-amber-100 font-medium">Puan</p>
               </div>
-              <p className="text-2xl font-bold text-gray-900">
-                {achievements.length - unlockedCount}
-              </p>
-              <p className="text-sm text-gray-500">Kilitli Rozet</p>
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-center border border-white/20">
+                <p className="text-2xl font-bold">{achievements.length - unlockedCount}</p>
+                <p className="text-xs text-amber-100 font-medium">Kilitli</p>
+              </div>
             </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-2">
+          {/* İlerleme çubuğu */}
+          <div className="relative z-10 mt-5 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Genel İlerleme</span>
-              <span className="font-medium text-gray-900">
-                {unlockedCount} / {achievements.length}
-              </span>
+              <span className="text-amber-100 font-medium">Genel İlerleme</span>
+              <span className="font-bold text-white">{unlockedCount} / {achievements.length}</span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-3">
+            <div className="w-full bg-white/20 rounded-full h-2.5">
               <div
-                className="bg-gradient-to-r from-amber-400 to-orange-500 h-3 rounded-full progress-bar"
-                style={{ width: `${progressPercentage}%` }}
+                className="bg-white h-2.5 rounded-full transition-all duration-500"
+                style={{ width: `${isNaN(progressPercentage) ? 0 : progressPercentage}%` }}
               />
             </div>
           </div>
@@ -190,7 +177,7 @@ export default function AchievementsPage() {
 
         {/* Achievement Categories */}
         {categorizeAchievements().map((category) => (
-          <div key={category.name} className="mb-8">
+          <div key={category.name}>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               {category.name}
             </h2>

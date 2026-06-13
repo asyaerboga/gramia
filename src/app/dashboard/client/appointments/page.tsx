@@ -174,7 +174,7 @@ export default function AppointmentsPage() {
 
   return (
     <div className="min-h-screen bg-[#f4f6fb] p-4 md:p-6">
-      <div className="max-w-5xl mx-auto space-y-5">
+      <div className="max-w-6xl mx-auto space-y-5">
 
         {/* ── Hero ─────────────────────────────────── */}
         <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-violet-600 via-purple-600 to-teal-400 p-6 md:p-8 text-white shadow-xl shadow-violet-200">

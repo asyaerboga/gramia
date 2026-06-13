@@ -40,16 +40,6 @@ const regionLabels: Record<keyof Regions, string> = {
   calf: "Baldır",
 };
 
-const regionEmojis: Record<keyof Regions, string> = {
-  neck: "🫴",
-  chest: "💪",
-  waist: "✨",
-  hip: "🌟",
-  arm: "💪",
-  thigh: "🦵",
-  calf: "🦵",
-};
-
 type ChartKey = keyof Regions | "weight" | "height";
 
 const extraLabels: Record<"weight" | "height", string> = {
@@ -70,7 +60,7 @@ function getDelta(current: number, previous: number) {
   return diff;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number | string }>; label?: string }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 px-4 py-3">
@@ -117,8 +107,9 @@ export default function MeasurementsPage() {
   }, []);
 
   useEffect(() => {
-    fetchMeasurements();
-    fetchProfile();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchMeasurements();
+    void fetchProfile();
   }, [fetchMeasurements, fetchProfile]);
 
   const latestMeasurement = measurements[measurements.length - 1];

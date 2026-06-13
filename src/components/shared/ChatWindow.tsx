@@ -161,7 +161,7 @@ function AudioPlayer({ src, isMine }: { src: string; isMine: boolean }) {
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
-  const toggle = () => { const a = audioRef.current; if (!a) return; playing ? a.pause() : a.play(); setPlaying(!playing); };
+  const toggle = () => { const a = audioRef.current; if (!a) return; if (playing) { a.pause(); } else { void a.play(); } setPlaying(!playing); };
   const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const a = audioRef.current; if (!a || !duration) return;
     a.currentTime = (Number(e.target.value) / 100) * duration; setProgress(Number(e.target.value));
@@ -938,7 +938,7 @@ export default function ChatWindow({
       {/* ── Context menu (fixed) ─────────────────────────── */}
       {contextMenu && (
         <div className="fixed z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 min-w-37.5 overflow-hidden"
-          style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}
         >
           {contextMenu.msg.type === "text" && onEditMessage && (
             <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"

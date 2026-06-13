@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/providers/ToastProvider";
-import { FaCog, FaUser, FaSave, FaCamera, FaTrash, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaCog, FaUser, FaSave, FaCamera, FaTrash, FaLock, FaEye, FaEyeSlash, FaShieldAlt, FaIdCard } from "react-icons/fa";
 
 interface DietitianProfile {
   name: string;
@@ -201,27 +201,47 @@ export default function DietitianSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white p-4 md:p-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <FaCog className="text-gray-500" />
-              Ayarlar
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Kişisel bilgilerinizi güncelleyin
-            </p>
+    <div className="min-h-screen bg-[#f4f6fb] p-4 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-5">
+
+        {/* ── Hero Banner ──────────────────────────────── */}
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-violet-600 via-purple-600 to-fuchsia-500 px-6 py-6 md:px-8 text-white shadow-xl shadow-violet-200">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15)_0%,transparent_60%)]" />
+          <div className="relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <p className="text-white/70 text-sm font-medium mb-1">Yönetim Paneli</p>
+                <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+                  <FaCog />
+                  Ayarlar
+                </h1>
+              </div>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/20 backdrop-blur-sm text-white rounded-xl text-sm font-semibold hover:bg-white/30 transition border border-white/20 disabled:opacity-50"
+              >
+                <FaSave size={13} />
+                {saving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+            </div>
+
+            {/* Info chips */}
+            <div className="flex flex-wrap gap-3">
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-2.5 border border-white/20">
+                <FaIdCard className="text-white/80 text-base" />
+                <span className="text-white/90 text-xs font-medium leading-tight">Profil<br/>Bilgileri</span>
+              </div>
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-2.5 border border-white/20">
+                <FaShieldAlt className="text-white/80 text-base" />
+                <span className="text-white/90 text-xs font-medium leading-tight">Güvenlik<br/>Ayarları</span>
+              </div>
+              <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-2.5 border border-white/20">
+                <FaCamera className="text-white/80 text-base" />
+                <span className="text-white/90 text-xs font-medium leading-tight">Profil<br/>Fotoğrafı</span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-6 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition disabled:opacity-50"
-          >
-            <FaSave />
-            {saving ? "Kaydediliyor..." : "Kaydet"}
-          </button>
         </div>
 
         {/* Profile Photo */}

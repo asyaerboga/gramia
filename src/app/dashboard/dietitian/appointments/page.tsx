@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   format,
   startOfMonth,
@@ -238,12 +239,6 @@ export default function DietitianAppointmentsPage() {
     } finally { setOverrideSaving(false); }
   };
 
-  const handleDeleteOverride = async (slotId: string) => {
-    await fetch(`/api/dietitian/slots?id=${slotId}`, { method: "DELETE" });
-    fetchMonthSlots();
-    setSelectedDaySlots(null);
-  };
-
   /* ─── Confirm modal ──────────────────────────────── */
   const runConfirm = async () => {
     if (!confirmModal) return;
@@ -354,7 +349,7 @@ export default function DietitianAppointmentsPage() {
   /* ─── Render ─────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-[#f4f6fb] p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-5">
+      <div className="max-w-6xl mx-auto space-y-5">
 
       {/* ── Hero Banner ──────────────────────────────── */}
       <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-indigo-600 via-blue-600 to-teal-500 px-6 py-6 md:px-8 text-white shadow-xl shadow-indigo-200">
@@ -375,13 +370,13 @@ export default function DietitianAppointmentsPage() {
               </button>
               <button
                 onClick={() => { setOverrideType("extra"); setShowOverrideModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-400/80 backdrop-blur-sm text-white rounded-xl text-sm font-semibold hover:bg-emerald-400 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-400 backdrop-blur-sm text-white rounded-xl text-sm font-semibold hover:bg-emerald-500 transition"
               >
                 <FaPlus size={10} /> Ekstra Saat
               </button>
               <button
                 onClick={() => { setOverrideType("blocked"); setShowOverrideModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-red-400/80 backdrop-blur-sm text-white rounded-xl text-sm font-semibold hover:bg-red-400 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-red-400 backdrop-blur-sm text-white rounded-xl text-sm font-semibold hover:bg-red-500 transition"
               >
                 🚫 Bloke Et
               </button>
@@ -399,10 +394,13 @@ export default function DietitianAppointmentsPage() {
               <span className="text-white/80 text-xs font-medium leading-tight">Yaklaşan<br/>Randevu</span>
             </div>
             {pendingCount > 0 && (
-              <div className="bg-amber-400/80 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-amber-300/40 animate-pulse">
+              <Link
+                href="/dashboard/dietitian#upcoming-appointments"
+                className="bg-amber-400/80 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-amber-300/40 animate-pulse hover:bg-amber-400 transition cursor-pointer"
+              >
                 <span className="text-2xl font-bold">{pendingCount}</span>
                 <span className="text-white/90 text-xs font-medium leading-tight">Onay<br/>Bekliyor</span>
-              </div>
+              </Link>
             )}
           </div>
         </div>

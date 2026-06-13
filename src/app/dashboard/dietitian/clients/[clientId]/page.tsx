@@ -201,6 +201,39 @@ const mealTypeIcons: Record<string, string> = {
   snack: "🍎",
 };
 
+const satietyEmojis = ["😫", "😕", "😊", "😄", "🤩"];
+const satietyLabels = ["Çok Aç", "Aç", "Normal", "Tok", "Çok Tok"];
+const satietyMealColors: Record<string, string> = {
+  breakfast: "bg-amber-50 text-amber-700 border-amber-100",
+  lunch: "bg-blue-50 text-blue-700 border-blue-100",
+  dinner: "bg-purple-50 text-purple-700 border-purple-100",
+  snack: "bg-green-50 text-green-700 border-green-100",
+};
+
+function getWeekMonday(d: Date): string {
+  const date = new Date(d);
+  const day = date.getDay();
+  date.setDate(date.getDate() + (day === 0 ? -6 : 1 - day));
+  date.setHours(0, 0, 0, 0);
+  return date.toISOString().split("T")[0];
+}
+
+const WEEK_OPTIONS = (() => {
+  const weeks: { value: string; label: string }[] = [];
+  const currentMonday = new Date(getWeekMonday(new Date()));
+  for (let i = 0; i < 12; i++) {
+    const start = new Date(currentMonday);
+    start.setDate(currentMonday.getDate() - i * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const value = start.toISOString().split("T")[0];
+    const sl = start.toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+    const el = end.toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+    weeks.push({ value, label: i === 0 ? `Bu hafta (${sl} – ${el})` : `${sl} – ${el}` });
+  }
+  return weeks;
+})();
+
 type TabType = "overview" | "exercises" | "wellness" | "meals" | "achievements";
 
 function StatCard({
@@ -249,6 +282,9 @@ export default function ClientProfilePage() {
   const initialTab = (searchParams.get("tab") as TabType) || "overview";
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [dateRange, setDateRange] = useState(7);
+  const [mealWeek, setMealWeek] = useState(() => getWeekMonday(new Date()));
+  const [mealWeekData, setMealWeekData] = useState<ClientData | null>(null);
+  const [calorieChartType, setCalorieChartType] = useState<"bar" | "line">("bar");
   const [client, setClient] = useState<ClientProfile | null>(null);
   const [measurements, setMeasurements] = useState<MeasurementRecord[]>([]);
   const [clientData, setClientData] = useState<ClientData | null>(null);
@@ -302,23 +338,39 @@ export default function ClientProfilePage() {
     }
   }, [clientId, dateRange]);
 
+  const fetchMealWeekData = useCallback(async () => {
+    const endDate = new Date(mealWeek);
+    endDate.setDate(endDate.getDate() + 6);
+    try {
+      const res = await fetch(
+        `/api/dietitian/clients/${clientId}/data?category=meals&startDate=${mealWeek}&endDate=${endDate.toISOString().split("T")[0]}`
+      );
+      if (res.ok) setMealWeekData(await res.json());
+    } catch (error) {
+      console.error("Failed to fetch meal week data:", error);
+    }
+  }, [clientId, mealWeek]);
+
   useEffect(() => {
     fetchClient();
     fetchMeasurements();
   }, [fetchClient, fetchMeasurements]);
 
   useEffect(() => { fetchClientData(); }, [fetchClientData]);
+  useEffect(() => { fetchMealWeekData(); }, [fetchMealWeekData]);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    const POLLING_TABS: TabType[] = ["wellness", "meals", "exercises"];
+    const POLLING_TABS: TabType[] = ["wellness", "exercises"];
     if (POLLING_TABS.includes(activeTab)) {
       pollingRef.current = setInterval(() => fetchClientData(), 30_000);
+    } else if (activeTab === "meals") {
+      pollingRef.current = setInterval(() => fetchMealWeekData(), 30_000);
     }
     return () => {
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     };
-  }, [activeTab, fetchClientData]);
+  }, [activeTab, fetchClientData, fetchMealWeekData]);
 
   const fetchHealth = useCallback(async () => {
     setHealthLoading(true);
@@ -457,13 +509,12 @@ export default function ClientProfilePage() {
     value: m.regions[selectedRegion],
   }));
 
-  const dailyCaloriesData = clientData?.meals?.summary.dailyCalories
-    ? Object.entries(clientData.meals.summary.dailyCalories)
+  const dailyCaloriesData = mealWeekData?.meals?.summary.dailyCalories
+    ? Object.entries(mealWeekData.meals.summary.dailyCalories)
         .map(([date, calories]) => ({
           date: new Date(date).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }),
           calories,
         }))
-        .slice(-7)
     : [];
 
   const tabs: { id: TabType; label: string; icon: string }[] = [
@@ -917,15 +968,29 @@ export default function ClientProfilePage() {
         {/* Meals Tab */}
         {activeTab === "meals" && (
           <div className="space-y-6 pb-8">
+            {/* Week selector */}
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Haftalık Öğün Geçmişi</h2>
+              <select
+                value={mealWeek}
+                onChange={(e) => setMealWeek(e.target.value)}
+                className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+              >
+                {WEEK_OPTIONS.map((w) => (
+                  <option key={w.value} value={w.value}>{w.label}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <StatCard label="Toplam Öğün" value={clientData?.meals?.summary.totalMeals || 0} color="bg-emerald-50 text-emerald-600" icon="🍽️" />
-              <StatCard label="Toplam Kalori" value={clientData?.meals?.summary.totalCalories || 0} sub="kcal" color="bg-orange-50 text-orange-600" icon="🔥" />
-              <StatCard label="Ort. Kalori/Gün" value={clientData?.meals?.summary.avgCaloriesPerDay || 0} sub="kcal" color="bg-blue-50 text-blue-600" icon="📊" />
+              <StatCard label="Toplam Öğün" value={mealWeekData?.meals?.summary.totalMeals || 0} color="bg-emerald-50 text-emerald-600" icon="🍽️" />
+              <StatCard label="Toplam Kalori" value={mealWeekData?.meals?.summary.totalCalories || 0} sub="kcal" color="bg-orange-50 text-orange-600" icon="🔥" />
+              <StatCard label="Ort. Kalori/Gün" value={mealWeekData?.meals?.summary.avgCaloriesPerDay || 0} sub="kcal" color="bg-blue-50 text-blue-600" icon="📊" />
               <StatCard label="Kalori Hedefi" value={client.targetCalories} sub="kcal/gün" color="bg-gray-100 text-gray-600" icon="🎯" />
               <StatCard
                 label="Ort. Tokluk"
-                value={clientData?.meals?.summary.avgSatiety
-                  ? `${["😫","😕","😊","😄","🤩"][Math.round(clientData.meals.summary.avgSatiety) - 1]} ${clientData.meals.summary.avgSatiety}`
+                value={mealWeekData?.meals?.summary.avgSatiety
+                  ? `${satietyEmojis[Math.round(mealWeekData.meals.summary.avgSatiety) - 1]} ${mealWeekData.meals.summary.avgSatiety}`
                   : "—"}
                 sub="/5"
                 color="bg-purple-50 text-purple-600"
@@ -935,24 +1000,50 @@ export default function ClientProfilePage() {
 
             {dailyCaloriesData.length > 0 && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <h3 className="font-semibold text-gray-900 mb-5">Günlük Kalori Alımı</h3>
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-semibold text-gray-900">Günlük Kalori Alımı</h3>
+                  <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                    <button
+                      onClick={() => setCalorieChartType("bar")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${calorieChartType === "bar" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      Sütun
+                    </button>
+                    <button
+                      onClick={() => setCalorieChartType("line")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${calorieChartType === "line" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      Çizgi
+                    </button>
+                  </div>
+                </div>
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={dailyCaloriesData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
-                    <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
-                    <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-                    <Bar dataKey="calories" fill="#10b981" radius={[6, 6, 0, 0]} />
-                  </BarChart>
+                  {calorieChartType === "bar" ? (
+                    <BarChart data={dailyCaloriesData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
+                      <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
+                      <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                      <Bar dataKey="calories" fill="#10b981" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  ) : (
+                    <LineChart data={dailyCaloriesData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
+                      <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
+                      <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                      <Line type="monotone" dataKey="calories" stroke="#10b981" strokeWidth={2.5} dot={{ fill: "#10b981", r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  )}
                 </ResponsiveContainer>
               </div>
             )}
 
-            {clientData?.meals?.summary.byType && Object.keys(clientData.meals.summary.byType).length > 0 && (
+            {mealWeekData?.meals?.summary.byType && Object.keys(mealWeekData.meals.summary.byType).length > 0 && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <h3 className="font-semibold text-gray-900 mb-4">Öğün Türlerine Göre</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {Object.entries(clientData.meals.summary.byType).map(([type, data]) => (
+                  {Object.entries(mealWeekData.meals.summary.byType).map(([type, data]) => (
                     <div key={type} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="text-2xl mb-2">{mealTypeIcons[type] || "🍴"}</div>
                       <p className="font-semibold text-gray-900 text-sm">{mealTypeLabels[type] || type}</p>
@@ -964,45 +1055,35 @@ export default function ClientProfilePage() {
               </div>
             )}
 
-            {clientData?.meals?.satietyRecords && clientData.meals.satietyRecords.length > 0 && (
+            {mealWeekData?.meals?.satietyRecords && mealWeekData.meals.satietyRecords.length > 0 && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <h3 className="font-semibold text-gray-900 mb-4">Tokluk Geçmişi</h3>
                 <div className="space-y-2">
-                  {clientData.meals.satietyRecords.slice(0, 20).map((s) => {
-                    const emojis = ["😫","😕","😊","😄","🤩"];
-                    const labels = ["Çok Aç","Aç","Normal","Tok","Çok Tok"];
-                    const mealColors: Record<string,string> = {
-                      breakfast:"bg-amber-50 text-amber-700 border-amber-100",
-                      lunch:"bg-blue-50 text-blue-700 border-blue-100",
-                      dinner:"bg-purple-50 text-purple-700 border-purple-100",
-                      snack:"bg-green-50 text-green-700 border-green-100",
-                    };
-                    return (
-                      <div key={s._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${mealColors[s.mealType] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                            {mealTypeIcons[s.mealType]} {mealTypeLabels[s.mealType] || s.mealType}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            {new Date(s.date).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{emojis[s.satietyLevel - 1]}</span>
-                          <span className="text-sm font-medium text-gray-700">{labels[s.satietyLevel - 1]}</span>
-                        </div>
+                  {mealWeekData.meals.satietyRecords.map((s) => (
+                    <div key={s._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${satietyMealColors[s.mealType] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                          {mealTypeIcons[s.mealType]} {mealTypeLabels[s.mealType] || s.mealType}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(s.date).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{satietyEmojis[s.satietyLevel - 1]}</span>
+                        <span className="text-sm font-medium text-gray-700">{satietyLabels[s.satietyLevel - 1]}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-4">Son Öğünler</h3>
-              {clientData?.meals?.items && clientData.meals.items.length > 0 ? (
+              <h3 className="font-semibold text-gray-900 mb-4">Haftanın Öğünleri</h3>
+              {mealWeekData?.meals?.items && mealWeekData.meals.items.length > 0 ? (
                 <div className="space-y-3">
-                  {clientData.meals.items.slice(0, 10).map((meal) => (
+                  {mealWeekData.meals.items.map((meal) => (
                     <div key={meal._id} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="flex items-center justify-between mb-2.5">
                         <div className="flex items-center gap-2">
@@ -1025,7 +1106,7 @@ export default function ClientProfilePage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState message="Henüz öğün kaydı yok." />
+                <EmptyState message="Bu haftaya ait öğün kaydı yok." />
               )}
             </div>
           </div>

@@ -38,16 +38,6 @@ function addDays(dateStr: string, days: number) {
   return getLocalDateStr(d);
 }
 
-function formatDateLabel(dateStr: string) {
-  const date = new Date(dateStr + "T12:00:00");
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
-  if (diff === 0) return "Bugün";
-  if (diff === -1) return "Dün";
-  if (diff === 1) return "Yarın";
-  return date.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
-}
 
 function getLocalDateStr(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -98,8 +88,9 @@ export default function MealsPage() {
   }, [selectedDate]);
 
   useEffect(() => {
-    fetchMeals();
-    fetchSatiety();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchMeals();
+    void fetchSatiety();
   }, [fetchMeals, fetchSatiety]);
 
   const handleAddItem = async (mealType: string, item: MealItem) => {
@@ -143,7 +134,7 @@ export default function MealsPage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-orange-50/30 to-amber-50/20 p-4 md:p-6">
-      <div className="max-w-4xl mx-auto space-y-5">
+      <div className="max-w-6xl mx-auto space-y-5">
 
         {/* Hero Banner */}
         <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-orange-500 via-amber-400 to-yellow-400 p-6 text-white shadow-xl shadow-orange-200">

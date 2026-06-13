@@ -72,6 +72,7 @@ export default function DatePickerModern({ value, onChange, min, max, className 
   // Sync calendar view when value changes externally
   useEffect(() => {
     const p = parseISO(value);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (p) { setViewYear(p[0]); setViewMonth(p[1]); }
   }, [value]);
 
@@ -130,7 +131,7 @@ export default function DatePickerModern({ value, onChange, min, max, className 
       <button
         ref={triggerRef}
         type="button"
-        onMouseDown={(e) => { e.stopPropagation(); open ? setOpen(false) : handleOpen(); }}
+        onMouseDown={(e) => { e.stopPropagation(); if (open) { setOpen(false); } else { handleOpen(); } }}
         className={`dropdown-trigger inline-flex items-center gap-2.5 px-3.5 py-2 ${open ? "open" : ""} ${className}`}
       >
         <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

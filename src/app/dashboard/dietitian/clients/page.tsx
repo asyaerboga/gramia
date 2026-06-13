@@ -401,50 +401,43 @@ export default function DietitianClientsPage() {
 
   /* ── Render ──────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-[#f4f6fb] p-4 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-5">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Danışanlar</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Tüm danışanlarınızı yönetin</p>
-          </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition shadow-sm shadow-emerald-200"
-          >
-            <FaUserPlus /> Yeni Danışan
-          </button>
-        </div>
+        {/* ── Hero Banner ──────────────────────────────── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-yellow-500 via-orange-500 to-amber-500 px-6 py-6 md:px-8 text-white shadow-xl shadow-orange-200">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.15)_0%,_transparent_60%)]" />
+          <div className="relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <p className="text-white/70 text-sm font-medium mb-1">Yönetim Paneli</p>
+                <h1 className="text-2xl md:text-3xl font-bold">Danışanlar</h1>
+              </div>
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-xl text-sm font-semibold hover:bg-white/30 transition border border-white/20"
+              >
+                <FaUserPlus size={12} /> Yeni Danışan
+              </button>
+            </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-4">
-            <div className="w-11 h-11 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
-              <FaUsers className="text-indigo-500 text-lg" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{totalClients}</p>
-              <p className="text-xs text-gray-500">Toplam Danışan</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-4">
-            <div className="w-11 h-11 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
-              <FaBolt className="text-emerald-500 text-lg" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{activeToday}</p>
-              <p className="text-xs text-gray-500">Bugün Aktif</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-4">
-            <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
-              <FaChartLine className="text-amber-500 text-lg" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">%{Math.round(avgProgress)}</p>
-              <p className="text-xs text-gray-500">Ort. İlerleme</p>
+            {/* Stats row */}
+            <div className="flex flex-wrap gap-3">
+              <div className="bg-blue-600 rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-blue-500">
+                <FaUsers className="text-white text-lg drop-shadow" />
+                <span className="text-2xl font-bold">{totalClients}</span>
+                <span className="text-blue-100 text-xs font-medium leading-tight">Toplam<br/>Danışan</span>
+              </div>
+              <div className="bg-red-600 rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-red-500">
+                <FaBolt className="text-white text-lg drop-shadow" />
+                <span className="text-2xl font-bold">{activeToday}</span>
+                <span className="text-red-100 text-xs font-medium leading-tight">Bugün<br/>Aktif</span>
+              </div>
+              <div className="bg-violet-600 rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-violet-500">
+                <FaChartLine className="text-white text-lg drop-shadow" />
+                <span className="text-2xl font-bold">%{Math.round(avgProgress)}</span>
+                <span className="text-violet-100 text-xs font-medium leading-tight">Ort.<br/>İlerleme</span>
+              </div>
             </div>
           </div>
         </div>
@@ -495,13 +488,13 @@ export default function DietitianClientsPage() {
             </div>
             {search ? (
               <>
-                <p className="text-gray-500 font-medium">"{search}" için sonuç bulunamadı</p>
+                <p className="text-gray-500 font-medium">&quot;{search}&quot; için sonuç bulunamadı</p>
                 <button onClick={() => setSearch("")} className="mt-2 text-sm text-emerald-600 hover:underline">Aramayı temizle</button>
               </>
             ) : (
               <>
                 <p className="text-gray-500 font-medium mb-1">Henüz danışan yok</p>
-                <p className="text-sm text-gray-400 mb-4">"Yeni Danışan" butonuyla başlayın.</p>
+                <p className="text-sm text-gray-400 mb-4">&quot;Yeni Danışan&quot; butonuyla başlayın.</p>
                 <button
                   onClick={() => setShowModal(true)}
                   className="px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition"

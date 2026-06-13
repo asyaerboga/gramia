@@ -5,9 +5,8 @@ import DatePickerModern from "@/components/shared/DatePickerModern";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
-  FaDumbbell, FaFire, FaClock, FaPlus, FaTrash,
-  FaRunning, FaBicycle, FaSwimmer, FaWalking,
-  FaSearch, FaCheckCircle, FaEdit, FaCalendarCheck, FaTimes,
+  FaClock, FaPlus, FaTrash,
+  FaSearch, FaEdit, FaTimes,
 } from "react-icons/fa";
 
 /* ── Types ──────────────────────────────────────────────── */
@@ -157,13 +156,6 @@ function computeWeekDates() {
     const dateStr = getLocalDateStr(d);
     return { label, dayOfWeek, fullName, dateStr, dayNum: d.getDate(), isToday: dateStr === todayStr };
   });
-}
-
-function ExerciseIcon({ type, className }: { type: ExerciseCategory; className?: string }) {
-  if (type === "cardio") return <FaRunning className={className} />;
-  if (type === "strength") return <FaDumbbell className={className} />;
-  if (type === "flexibility") return <FaSwimmer className={className} />;
-  return <FaBicycle className={className} />;
 }
 
 function emptyEditDays(): DayProgram[] {

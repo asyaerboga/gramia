@@ -1,6 +1,5 @@
 // In-memory typing state using globalThis for persistence across hot reloads
 declare global {
-  // eslint-disable-next-line no-var
   var typingStore: Map<string, number> | undefined;
 }
 

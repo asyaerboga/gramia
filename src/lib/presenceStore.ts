@@ -1,6 +1,5 @@
 // In-memory presence (online/last-seen) using globalThis — persistent across hot reloads
 declare global {
-  // eslint-disable-next-line no-var
   var __presenceMap: Map<string, number> | undefined;
 }
 

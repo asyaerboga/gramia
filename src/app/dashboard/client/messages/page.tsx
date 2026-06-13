@@ -55,9 +55,9 @@ export default function ClientMessagesPage() {
   const [groupUnreads, setGroupUnreads] = useState<Map<string, number>>(new Map());
 
   const selectedItemRef = useRef<SelectedItem | null>(null);
-  selectedItemRef.current = selectedItem;
   const dietitianRef = useRef<ChatPartner | null>(null);
-  dietitianRef.current = dietitian;
+  useEffect(() => { selectedItemRef.current = selectedItem; }, [selectedItem]);
+  useEffect(() => { dietitianRef.current = dietitian; }, [dietitian]);
 
   /* ── Fetch dietitian ───────────────────────────── */
   const fetchDietitian = useCallback(async () => {
@@ -158,12 +158,14 @@ export default function ClientMessagesPage() {
 
   /* ── Effects ───────────────────────────────────── */
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDietitian();
     fetchGroups();
   }, [fetchDietitian, fetchGroups]);
 
   useEffect(() => {
     if (!dietitian) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUnreadCounts();
     const id = setInterval(fetchUnreadCounts, 5000);
     return () => clearInterval(id);
@@ -175,6 +177,7 @@ export default function ClientMessagesPage() {
   }, [fetchGroups]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMessages();
     const id = setInterval(fetchMessages, 2000);
     return () => clearInterval(id);
@@ -182,6 +185,7 @@ export default function ClientMessagesPage() {
 
   useEffect(() => {
     if (selectedItem?.kind !== "dietitian") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTypingStatus();
     const id = setInterval(fetchTypingStatus, 1500);
     return () => clearInterval(id);
@@ -189,11 +193,13 @@ export default function ClientMessagesPage() {
 
   useEffect(() => {
     if (selectedItem?.kind !== "dietitian") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPresence();
     const id = setInterval(fetchPresence, 15_000);
     return () => clearInterval(id);
   }, [selectedItem, fetchPresence]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPartnerTyping(false); }, [selectedItem]);
 
   useEffect(() => {
@@ -322,7 +328,7 @@ export default function ClientMessagesPage() {
   return (
     <div className="flex flex-col lg:flex-row h-screen">
       {/* Left panel */}
-      <div className="w-full lg:w-1/4 flex flex-col" style={{ background: "linear-gradient(160deg, #7c3aed 0%, #6d28d9 55%, #0d9488 100%)" }}>
+      <div className="w-full lg:w-1/4 flex flex-col" style={{ background: "linear-gradient(160deg, #34d399 0%, #10b981 55%, #059669 100%)" }}>
         {/* Panel header */}
         <div className="px-5 pt-5 pb-4 shrink-0">
           <div className="flex items-center gap-3 mb-1.5">
@@ -331,18 +337,18 @@ export default function ClientMessagesPage() {
             </div>
             <h1 className="text-white font-bold text-xl tracking-tight">Mesajlar</h1>
           </div>
-          <p className="text-violet-200 text-xs leading-snug pl-0.5">Diyetisyeninizle bağlantıda kalın</p>
+          <p className="text-emerald-100 text-xs leading-snug pl-0.5">Diyetisyeninizle bağlantıda kalın</p>
         </div>
 
         {/* Tabs */}
         <div className="px-4 pb-4 shrink-0">
-          <div className="flex rounded-2xl p-1" style={{ background: "rgba(0,0,0,0.2)" }}>
+          <div className="flex rounded-2xl p-1" style={{ background: "rgba(0,0,0,0.15)" }}>
             <button
               onClick={handleTabDietitian}
               className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all duration-200 ${
                 activeTab === "dietitian"
-                  ? "bg-white text-violet-700 shadow-md"
-                  : "text-violet-100 hover:text-white hover:bg-white/10"
+                  ? "bg-white text-emerald-700 shadow-md"
+                  : "text-emerald-100 hover:text-white hover:bg-white/10"
               }`}
             >
               👨‍⚕️ Diyetisyenim
@@ -351,8 +357,8 @@ export default function ClientMessagesPage() {
               onClick={handleTabGroups}
               className={`flex-1 text-xs font-semibold py-2 rounded-xl transition-all duration-200 flex items-center justify-center gap-1.5 ${
                 activeTab === "groups"
-                  ? "bg-white text-violet-700 shadow-md"
-                  : "text-violet-100 hover:text-white hover:bg-white/10"
+                  ? "bg-white text-emerald-700 shadow-md"
+                  : "text-emerald-100 hover:text-white hover:bg-white/10"
               }`}
             >
               <FaUsers className="text-[11px]" />
@@ -378,8 +384,8 @@ export default function ClientMessagesPage() {
               <>
                 {dietitian ? (
                   <div
-                    className={`flex items-center gap-3.5 p-4 hover:bg-violet-50/70 transition-all cursor-pointer border-b border-gray-50 ${
-                      selectedItem?.kind === "dietitian" ? "bg-violet-50" : ""
+                    className={`flex items-center gap-3.5 p-4 hover:bg-emerald-50/70 transition-all cursor-pointer border-b border-gray-50 ${
+                      selectedItem?.kind === "dietitian" ? "bg-emerald-50" : ""
                     }`}
                     onClick={() => { setSelectedItem({ kind: "dietitian", data: dietitian }); markAsRead(dietitian._id); }}
                   >
