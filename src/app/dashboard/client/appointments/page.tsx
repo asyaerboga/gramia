@@ -35,7 +35,8 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 function CountdownBadge({ date, time }: { date: string; time: string }) {
-  const aptDate = new Date(`${date}T${time}:00`);
+  const dateOnly = date.slice(0, 10);
+  const aptDate = new Date(`${dateOnly}T${time}:00`);
   const hours = differenceInHours(aptDate, new Date());
   const days  = differenceInDays(aptDate, new Date());
   if (hours < 0) return null;
@@ -416,7 +417,7 @@ export default function AppointmentsPage() {
                       <p className="font-semibold text-gray-800 text-sm">
                         {new Date(apt.date).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" })}
                       </p>
-                      <CountdownBadge date={apt.date} time={apt.time} />
+                      {apt.status !== "cancelled" && <CountdownBadge date={apt.date} time={apt.time} />}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
                       <span>⏰ {apt.time}</span>

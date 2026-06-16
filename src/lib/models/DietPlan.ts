@@ -22,6 +22,7 @@ export interface IDietPlan extends Document {
   dietitianId: Types.ObjectId;
   name: string;
   description?: string;
+  planType: "weekly" | "monthly" | "general";
   startDate: Date;
   endDate?: Date;
   isActive: boolean;
@@ -71,6 +72,7 @@ const DietPlanSchema = new Schema<IDietPlan>(
     dietitianId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     name: { type: String, required: true },
     description: { type: String },
+    planType: { type: String, enum: ["weekly", "monthly", "general"], default: "weekly" },
     startDate: { type: Date, required: true },
     endDate: { type: Date },
     isActive: { type: Boolean, default: true },

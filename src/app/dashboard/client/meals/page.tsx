@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import MealCard from "@/components/client/MealCard";
 import DatePickerModern from "@/components/shared/DatePickerModern";
+import DietPlanModal from "@/components/client/DietPlanModal";
 
 interface MealItem {
   name: string;
@@ -25,6 +26,15 @@ interface SatietyRecord {
   satietyLevel: number;
 }
 
+interface DietPlan {
+  _id: string;
+  name: string;
+  planType: "weekly" | "monthly" | "general";
+  targetCalories: number;
+  startDate?: string;
+  weeklyPlan: Record<string, unknown>;
+}
+
 const mealLabels: Record<string, string> = {
   breakfast: "🥣 Kahvaltı",
   lunch: "🍽️ Öğlen",
@@ -32,12 +42,18 @@ const mealLabels: Record<string, string> = {
   snack: "🍎 Atıştırmalık",
 };
 
+const PLAN_TYPE_META = {
+  weekly:  { icon: "📅", label: "Haftalık", order: 0 },
+  monthly: { icon: "📆", label: "Aylık",    order: 1 },
+  general: { icon: "✨", label: "Genel",    order: 2 },
+} as const;
+
+
 function addDays(dateStr: string, days: number) {
   const d = new Date(dateStr + "T12:00:00");
   d.setDate(d.getDate() + days);
   return getLocalDateStr(d);
 }
-
 
 function getLocalDateStr(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -47,13 +63,11 @@ export default function MealsPage() {
   const router = useRouter();
   const todayStr = getLocalDateStr();
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [meals, setMeals] = useState<MealsByType>({
-    breakfast: [],
-    lunch: [],
-    dinner: [],
-    snack: [],
-  });
+  const [meals, setMeals] = useState<MealsByType>({ breakfast: [], lunch: [], dinner: [], snack: [] });
   const [satiety, setSatiety] = useState<Record<string, number>>({});
+  const [dietPlans, setDietPlans] = useState<DietPlan[]>([]);
+  const [activePlan, setActivePlan] = useState<DietPlan | null>(null);
+  const [showPlanModal, setShowPlanModal] = useState(false);
 
   const fetchMeals = useCallback(async () => {
     try {
@@ -87,18 +101,42 @@ export default function MealsPage() {
     }
   }, [selectedDate]);
 
+  const fetchDietPlans = useCallback(async () => {
+    try {
+      // activeOnly filtresi yok — her tipten en son planı göster
+      const res = await fetch("/api/diet-plans");
+      if (res.ok) {
+        const data: DietPlan[] = await res.json();
+        // API createdAt desc sıralar; her tipten ilki (en yeni) alınır
+        const byType = new Map<string, DietPlan>();
+        for (const plan of data) {
+          if (!byType.has(plan.planType)) byType.set(plan.planType, plan);
+        }
+        const sorted = Array.from(byType.values()).sort(
+          (a, b) => PLAN_TYPE_META[a.planType].order - PLAN_TYPE_META[b.planType].order,
+        );
+        setDietPlans(sorted);
+      }
+    } catch {
+      // sessizce geç
+    }
+  }, []);
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchMeals();
     void fetchSatiety();
   }, [fetchMeals, fetchSatiety]);
 
-  const handleAddItem = async (mealType: string, item: MealItem) => {
+  useEffect(() => {
+    void fetchDietPlans();
+  }, [fetchDietPlans]);
+
+  const handleAddItem = async (mealType: string, items: MealItem[]) => {
     try {
       const res = await fetch("/api/meals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: selectedDate, mealType, items: [item] }),
+        body: JSON.stringify({ date: selectedDate, mealType, items }),
       });
       if (res.ok) {
         fetchMeals();
@@ -132,13 +170,18 @@ export default function MealsPage() {
   const isToday = selectedDate === todayStr;
   const isPast = selectedDate < todayStr;
 
+  const openPlan = (plan: DietPlan) => {
+    setActivePlan(plan);
+    setShowPlanModal(true);
+  };
+
   return (
+    <>
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-orange-50/30 to-amber-50/20 p-4 md:p-6">
       <div className="max-w-6xl mx-auto space-y-5">
 
         {/* Hero Banner */}
         <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-orange-500 via-amber-400 to-yellow-400 p-6 text-white shadow-xl shadow-orange-200">
-          {/* Decorative circles */}
           <div className="absolute -top-8 -right-8 w-48 h-48 bg-white/10 rounded-full blur-sm" />
           <div className="absolute -bottom-10 -left-6 w-40 h-40 bg-white/10 rounded-full blur-sm" />
           <div className="absolute top-4 right-32 w-6 h-6 bg-white/20 rounded-full" />
@@ -175,20 +218,13 @@ export default function MealsPage() {
             >
               ‹
             </button>
-
-            <DatePickerModern
-              value={selectedDate}
-              onChange={setSelectedDate}
-              className="flex-1"
-            />
-
+            <DatePickerModern value={selectedDate} onChange={setSelectedDate} className="flex-1" />
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, 1))}
               className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/15 border border-white/20 text-white hover:bg-white/25 transition-colors text-xl leading-none backdrop-blur-sm shrink-0"
             >
               ›
             </button>
-
             {!isToday && (
               <button
                 onClick={() => setSelectedDate(todayStr)}
@@ -225,26 +261,41 @@ export default function MealsPage() {
               </div>
             </div>
           </div>
-
           {macroCalories > 0 ? (
             <div className="flex rounded-full h-2.5 overflow-hidden bg-gray-100">
-              <div
-                className="bg-rose-400 transition-all duration-500"
-                style={{ width: `${(totalProtein * 4 / macroCalories) * 100}%` }}
-              />
-              <div
-                className="bg-amber-400 transition-all duration-500"
-                style={{ width: `${(totalCarbs * 4 / macroCalories) * 100}%` }}
-              />
-              <div
-                className="bg-sky-400 transition-all duration-500"
-                style={{ width: `${(totalFat * 9 / macroCalories) * 100}%` }}
-              />
+              <div className="bg-rose-400 transition-all duration-500" style={{ width: `${(totalProtein * 4 / macroCalories) * 100}%` }} />
+              <div className="bg-amber-400 transition-all duration-500" style={{ width: `${(totalCarbs * 4 / macroCalories) * 100}%` }} />
+              <div className="bg-sky-400 transition-all duration-500" style={{ width: `${(totalFat * 9 / macroCalories) * 100}%` }} />
             </div>
           ) : (
             <div className="h-2.5 rounded-full bg-gray-100" />
           )}
         </div>
+
+        {/* Beslenme planı tip seçici */}
+        {dietPlans.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Beslenme Planlarım</p>
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${dietPlans.length}, minmax(0, 1fr))` }}>
+              {dietPlans.map((plan) => {
+                const meta = PLAN_TYPE_META[plan.planType];
+                return (
+                  <button
+                    key={plan._id}
+                    onClick={() => openPlan(plan)}
+                    className="flex flex-col items-center gap-2 border-2 border-gray-100 hover:border-emerald-300 hover:bg-emerald-50/50 rounded-2xl p-3.5 transition-all group"
+                  >
+                    <span className="text-2xl">{meta.icon}</span>
+                    <span className="text-xs font-bold text-gray-700 group-hover:text-emerald-700">{meta.label}</span>
+                    <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      {plan.targetCalories} kcal
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Meal cards grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -264,5 +315,15 @@ export default function MealsPage() {
 
       </div>
     </div>
+
+    {showPlanModal && activePlan && (
+      <DietPlanModal
+        plan={activePlan}
+        onClose={() => { setShowPlanModal(false); setActivePlan(null); }}
+        onAddToLog={(mealType, items) => handleAddItem(mealType, items)}
+        currentDate={selectedDate}
+      />
+    )}
+    </>
   );
 }

@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       clientId,
       name,
       description,
+      planType,
       startDate,
       endDate,
       targetCalories,
@@ -88,9 +89,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
     }
 
-    // Önce diğer aktif planları pasif yap
+    // Sadece aynı türdeki aktif planları pasif yap — farklı türler birlikte aktif kalabilir
     await DietPlan.updateMany(
-      { clientId, isActive: true },
+      { clientId, planType: planType || "weekly", isActive: true },
       { $set: { isActive: false } },
     );
 
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
       dietitianId: session.user.id,
       name,
       description,
+      planType: planType || "weekly",
       startDate: new Date(startDate),
       endDate: endDate ? new Date(endDate) : undefined,
       isActive: true,
@@ -164,10 +166,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
     }
 
-    // Aktif yapılıyorsa diğerlerini pasif yap
+    // Aktif yapılıyorsa sadece aynı türdeki diğerlerini pasif yap
     if (updates.isActive === true) {
       await DietPlan.updateMany(
-        { clientId: plan.clientId, isActive: true, _id: { $ne: planId } },
+        { clientId: plan.clientId, planType: plan.planType, isActive: true, _id: { $ne: planId } },
         { $set: { isActive: false } },
       );
     }

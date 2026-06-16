@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import DatePickerModern from "@/components/shared/DatePickerModern";
+import MealPlanModal from "@/components/dietitian/MealPlanModal";
 import { useParams, useSearchParams } from "next/navigation";
 import MannequinChart from "@/components/client/MannequinChart";
 import CalorieBar from "@/components/client/CalorieBar";
@@ -284,7 +285,13 @@ export default function ClientProfilePage() {
   const [dateRange, setDateRange] = useState(7);
   const [mealWeek, setMealWeek] = useState(() => getWeekMonday(new Date()));
   const [mealWeekData, setMealWeekData] = useState<ClientData | null>(null);
+  const [mealViewMode, setMealViewMode] = useState<"daily" | "weekly" | "yearly">("weekly");
+  const [mealDay, setMealDay] = useState(() => new Date().toISOString().split("T")[0]);
+  const [mealDayData, setMealDayData] = useState<ClientData | null>(null);
+  const [mealYear, setMealYear] = useState(() => new Date().getFullYear());
+  const [mealYearData, setMealYearData] = useState<ClientData | null>(null);
   const [calorieChartType, setCalorieChartType] = useState<"bar" | "line">("bar");
+  const [yearlyChartType, setYearlyChartType] = useState<"bar" | "line">("bar");
   const [client, setClient] = useState<ClientProfile | null>(null);
   const [measurements, setMeasurements] = useState<MeasurementRecord[]>([]);
   const [clientData, setClientData] = useState<ClientData | null>(null);
@@ -310,6 +317,7 @@ export default function ClientProfilePage() {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [showMealPlanModal, setShowMealPlanModal] = useState(false);
 
   const fetchClient = useCallback(async () => {
     try {
@@ -351,6 +359,30 @@ export default function ClientProfilePage() {
     }
   }, [clientId, mealWeek]);
 
+  const fetchMealDayData = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/dietitian/clients/${clientId}/data?category=meals&startDate=${mealDay}&endDate=${mealDay}`
+      );
+      if (res.ok) setMealDayData(await res.json());
+    } catch (error) {
+      console.error("Failed to fetch meal day data:", error);
+    }
+  }, [clientId, mealDay]);
+
+  const fetchMealYearData = useCallback(async () => {
+    const startDate = `${mealYear}-01-01`;
+    const endDate = `${mealYear}-12-31`;
+    try {
+      const res = await fetch(
+        `/api/dietitian/clients/${clientId}/data?category=meals&startDate=${startDate}&endDate=${endDate}`
+      );
+      if (res.ok) setMealYearData(await res.json());
+    } catch (error) {
+      console.error("Failed to fetch meal year data:", error);
+    }
+  }, [clientId, mealYear]);
+
   useEffect(() => {
     fetchClient();
     fetchMeasurements();
@@ -358,6 +390,8 @@ export default function ClientProfilePage() {
 
   useEffect(() => { fetchClientData(); }, [fetchClientData]);
   useEffect(() => { fetchMealWeekData(); }, [fetchMealWeekData]);
+  useEffect(() => { fetchMealDayData(); }, [fetchMealDayData]);
+  useEffect(() => { fetchMealYearData(); }, [fetchMealYearData]);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
@@ -365,12 +399,14 @@ export default function ClientProfilePage() {
     if (POLLING_TABS.includes(activeTab)) {
       pollingRef.current = setInterval(() => fetchClientData(), 30_000);
     } else if (activeTab === "meals") {
-      pollingRef.current = setInterval(() => fetchMealWeekData(), 30_000);
+      if (mealViewMode === "daily") pollingRef.current = setInterval(() => fetchMealDayData(), 30_000);
+      else if (mealViewMode === "weekly") pollingRef.current = setInterval(() => fetchMealWeekData(), 30_000);
+      else if (mealViewMode === "yearly") pollingRef.current = setInterval(() => fetchMealYearData(), 30_000);
     }
     return () => {
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     };
-  }, [activeTab, fetchClientData, fetchMealWeekData]);
+  }, [activeTab, mealViewMode, fetchClientData, fetchMealWeekData, fetchMealDayData, fetchMealYearData]);
 
   const fetchHealth = useCallback(async () => {
     setHealthLoading(true);
@@ -517,6 +553,21 @@ export default function ClientProfilePage() {
         }))
     : [];
 
+  const monthlyCaloriesData = (() => {
+    if (!mealYearData?.meals?.summary.dailyCalories) return [];
+    const byMonth: Record<string, number> = {};
+    Object.entries(mealYearData.meals.summary.dailyCalories).forEach(([date, cal]) => {
+      const month = date.substring(0, 7);
+      byMonth[month] = (byMonth[month] || 0) + cal;
+    });
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, calories]) => ({
+        date: new Date(month + "-15").toLocaleDateString("tr-TR", { month: "long" }),
+        calories,
+      }));
+  })();
+
   const tabs: { id: TabType; label: string; icon: string }[] = [
     { id: "overview", label: "Genel Bakış", icon: "📊" },
     { id: "exercises", label: "Egzersiz", icon: "🏃" },
@@ -613,9 +664,13 @@ export default function ClientProfilePage() {
               </button>
               <button
                 onClick={() => setShowWeightModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-50 transition shadow-sm"
+                className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 active:translate-y-0"
               >
-                ⚖️ Kilo Güncelle
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="5" r="3"/>
+                  <path d="M6.5 8a2 2 0 00-1.905 1.46L2.1 18.5A2 2 0 004 21h16a2 2 0 001.925-2.54L19.4 9.46A2 2 0 0017.48 8z"/>
+                </svg>
+                Kilo Güncelle
               </button>
             </div>
           </div>
@@ -968,147 +1023,349 @@ export default function ClientProfilePage() {
         {/* Meals Tab */}
         {activeTab === "meals" && (
           <div className="space-y-6 pb-8">
-            {/* Week selector */}
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Haftalık Öğün Geçmişi</h2>
-              <select
-                value={mealWeek}
-                onChange={(e) => setMealWeek(e.target.value)}
-                className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
-              >
-                {WEEK_OPTIONS.map((w) => (
-                  <option key={w.value} value={w.value}>{w.label}</option>
+            {/* View Mode Selector */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                {(["daily", "weekly", "yearly"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setMealViewMode(mode)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      mealViewMode === mode
+                        ? "bg-white text-emerald-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {mode === "daily" ? "Günlük" : mode === "weekly" ? "Haftalık" : "Yıllık"}
+                  </button>
                 ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <StatCard label="Toplam Öğün" value={mealWeekData?.meals?.summary.totalMeals || 0} color="bg-emerald-50 text-emerald-600" icon="🍽️" />
-              <StatCard label="Toplam Kalori" value={mealWeekData?.meals?.summary.totalCalories || 0} sub="kcal" color="bg-orange-50 text-orange-600" icon="🔥" />
-              <StatCard label="Ort. Kalori/Gün" value={mealWeekData?.meals?.summary.avgCaloriesPerDay || 0} sub="kcal" color="bg-blue-50 text-blue-600" icon="📊" />
-              <StatCard label="Kalori Hedefi" value={client.targetCalories} sub="kcal/gün" color="bg-gray-100 text-gray-600" icon="🎯" />
-              <StatCard
-                label="Ort. Tokluk"
-                value={mealWeekData?.meals?.summary.avgSatiety
-                  ? `${satietyEmojis[Math.round(mealWeekData.meals.summary.avgSatiety) - 1]} ${mealWeekData.meals.summary.avgSatiety}`
-                  : "—"}
-                sub="/5"
-                color="bg-purple-50 text-purple-600"
-                icon="😋"
-              />
-            </div>
-
-            {dailyCaloriesData.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="font-semibold text-gray-900">Günlük Kalori Alımı</h3>
-                  <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-                    <button
-                      onClick={() => setCalorieChartType("bar")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${calorieChartType === "bar" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                    >
-                      Sütun
-                    </button>
-                    <button
-                      onClick={() => setCalorieChartType("line")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${calorieChartType === "line" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                    >
-                      Çizgi
-                    </button>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={240}>
-                  {calorieChartType === "bar" ? (
-                    <BarChart data={dailyCaloriesData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
-                      <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
-                      <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-                      <Bar dataKey="calories" fill="#10b981" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  ) : (
-                    <LineChart data={dailyCaloriesData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
-                      <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
-                      <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-                      <Line type="monotone" dataKey="calories" stroke="#10b981" strokeWidth={2.5} dot={{ fill: "#10b981", r: 4 }} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  )}
-                </ResponsiveContainer>
               </div>
-            )}
-
-            {mealWeekData?.meals?.summary.byType && Object.keys(mealWeekData.meals.summary.byType).length > 0 && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <h3 className="font-semibold text-gray-900 mb-4">Öğün Türlerine Göre</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {Object.entries(mealWeekData.meals.summary.byType).map(([type, data]) => (
-                    <div key={type} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                      <div className="text-2xl mb-2">{mealTypeIcons[type] || "🍴"}</div>
-                      <p className="font-semibold text-gray-900 text-sm">{mealTypeLabels[type] || type}</p>
-                      <p className="text-xs text-gray-500 mt-1">{data.count} öğün</p>
-                      <p className="text-xs text-emerald-600 font-medium mt-1">{data.calories} kcal</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {mealWeekData?.meals?.satietyRecords && mealWeekData.meals.satietyRecords.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <h3 className="font-semibold text-gray-900 mb-4">Tokluk Geçmişi</h3>
-                <div className="space-y-2">
-                  {mealWeekData.meals.satietyRecords.map((s) => (
-                    <div key={s._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${satietyMealColors[s.mealType] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                          {mealTypeIcons[s.mealType]} {mealTypeLabels[s.mealType] || s.mealType}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(s.date).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{satietyEmojis[s.satietyLevel - 1]}</span>
-                        <span className="text-sm font-medium text-gray-700">{satietyLabels[s.satietyLevel - 1]}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-4">Haftanın Öğünleri</h3>
-              {mealWeekData?.meals?.items && mealWeekData.meals.items.length > 0 ? (
-                <div className="space-y-3">
-                  {mealWeekData.meals.items.map((meal) => (
-                    <div key={meal._id} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{mealTypeIcons[meal.mealType] || "🍴"}</span>
-                          <span className="font-semibold text-gray-900 text-sm">{mealTypeLabels[meal.mealType] || meal.mealType}</span>
-                          <span className="text-xs text-gray-400">
-                            {new Date(meal.date).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-emerald-600">{meal.totalCalories} kcal</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {meal.items.map((f, i) => (
-                          <span key={i} className="text-xs px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-gray-600">
-                            {f.name}{f.portion ? ` (${f.portion})` : ""}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState message="Bu haftaya ait öğün kaydı yok." />
+              {mealViewMode === "daily" && (
+                <DatePickerModern value={mealDay} onChange={setMealDay} className="max-w-xs" />
               )}
+              {mealViewMode === "weekly" && (
+                <select
+                  value={mealWeek}
+                  onChange={(e) => setMealWeek(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                >
+                  {WEEK_OPTIONS.map((w) => (
+                    <option key={w.value} value={w.value}>{w.label}</option>
+                  ))}
+                </select>
+              )}
+              {mealViewMode === "yearly" && (
+                <select
+                  value={mealYear}
+                  onChange={(e) => setMealYear(Number(e.target.value))}
+                  className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                >
+                  {[0, 1, 2, 3].map((offset) => {
+                    const y = new Date().getFullYear() - offset;
+                    return <option key={y} value={y}>{y} Yılı</option>;
+                  })}
+                </select>
+              )}
+              </div>
+              <button
+                onClick={() => setShowMealPlanModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm shrink-0"
+              >
+                <span>📋</span> Yemek Listesi Oluştur
+              </button>
             </div>
+
+            {/* ── GÜNLÜK GÖRÜNÜM ── */}
+            {mealViewMode === "daily" && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard label="Toplam Kalori" value={mealDayData?.meals?.summary.totalCalories || 0} sub="kcal" color="bg-orange-50 text-orange-600" icon="🔥" />
+                  <StatCard label="Kalori Hedefi" value={client.targetCalories} sub="kcal/gün" color="bg-gray-100 text-gray-600" icon="🎯" />
+                  <StatCard label="Öğün Sayısı" value={mealDayData?.meals?.summary.totalMeals || 0} color="bg-emerald-50 text-emerald-600" icon="🍽️" />
+                  <StatCard
+                    label="Ort. Tokluk"
+                    value={mealDayData?.meals?.summary.avgSatiety
+                      ? `${satietyEmojis[Math.round(mealDayData.meals.summary.avgSatiety) - 1]} ${mealDayData.meals.summary.avgSatiety}`
+                      : "—"}
+                    sub="/5"
+                    color="bg-purple-50 text-purple-600"
+                    icon="😋"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(["breakfast", "lunch", "dinner", "snack"] as const).map((type) => {
+                    const typeMeals = mealDayData?.meals?.items.filter((m) => m.mealType === type) || [];
+                    const typeSatiety = mealDayData?.meals?.satietyRecords?.find((s) => s.mealType === type);
+                    const typeCalories = typeMeals.reduce((sum, m) => sum + m.totalCalories, 0);
+                    return (
+                      <div key={type} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{mealTypeIcons[type]}</span>
+                            <span className="font-semibold text-gray-900 text-sm">{mealTypeLabels[type]}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {typeSatiety && (
+                              <span title={satietyLabels[typeSatiety.satietyLevel - 1]} className="text-lg">
+                                {satietyEmojis[typeSatiety.satietyLevel - 1]}
+                              </span>
+                            )}
+                            {typeCalories > 0 && (
+                              <span className="text-sm font-bold text-emerald-600">{typeCalories} kcal</span>
+                            )}
+                          </div>
+                        </div>
+                        {typeMeals.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {typeMeals.flatMap((m) => m.items).map((f, i) => (
+                              <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                                <span className="text-gray-700">{f.name}{f.portion ? ` (${f.portion})` : ""}</span>
+                                <span className="text-gray-400 text-xs shrink-0 ml-2">{f.calories} kcal</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 py-2">Bu öğün kaydedilmemiş</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* ── HAFTALIK GÖRÜNÜM ── */}
+            {mealViewMode === "weekly" && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <StatCard label="Toplam Öğün" value={mealWeekData?.meals?.summary.totalMeals || 0} color="bg-emerald-50 text-emerald-600" icon="🍽️" />
+                  <StatCard label="Toplam Kalori" value={mealWeekData?.meals?.summary.totalCalories || 0} sub="kcal" color="bg-orange-50 text-orange-600" icon="🔥" />
+                  <StatCard label="Ort. Kalori/Gün" value={mealWeekData?.meals?.summary.avgCaloriesPerDay || 0} sub="kcal" color="bg-blue-50 text-blue-600" icon="📊" />
+                  <StatCard label="Kalori Hedefi" value={client.targetCalories} sub="kcal/gün" color="bg-gray-100 text-gray-600" icon="🎯" />
+                  <StatCard
+                    label="Ort. Tokluk"
+                    value={mealWeekData?.meals?.summary.avgSatiety
+                      ? `${satietyEmojis[Math.round(mealWeekData.meals.summary.avgSatiety) - 1]} ${mealWeekData.meals.summary.avgSatiety}`
+                      : "—"}
+                    sub="/5"
+                    color="bg-purple-50 text-purple-600"
+                    icon="😋"
+                  />
+                </div>
+
+                {dailyCaloriesData.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="font-semibold text-gray-900">Günlük Kalori Alımı</h3>
+                      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                        <button
+                          onClick={() => setCalorieChartType("bar")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${calorieChartType === "bar" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                          Sütun
+                        </button>
+                        <button
+                          onClick={() => setCalorieChartType("line")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${calorieChartType === "line" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                          Çizgi
+                        </button>
+                      </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={240}>
+                      {calorieChartType === "bar" ? (
+                        <BarChart data={dailyCaloriesData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
+                          <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
+                          <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                          <Bar dataKey="calories" fill="#10b981" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      ) : (
+                        <LineChart data={dailyCaloriesData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
+                          <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
+                          <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                          <Line type="monotone" dataKey="calories" stroke="#10b981" strokeWidth={2.5} dot={{ fill: "#10b981", r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      )}
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {mealWeekData?.meals?.summary.byType && Object.keys(mealWeekData.meals.summary.byType).length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-semibold text-gray-900 mb-4">Öğün Türlerine Göre</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {Object.entries(mealWeekData.meals.summary.byType).map(([type, data]) => (
+                        <div key={type} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <div className="text-2xl mb-2">{mealTypeIcons[type] || "🍴"}</div>
+                          <p className="font-semibold text-gray-900 text-sm">{mealTypeLabels[type] || type}</p>
+                          <p className="text-xs text-gray-500 mt-1">{data.count} öğün</p>
+                          <p className="text-xs text-emerald-600 font-medium mt-1">{data.calories} kcal</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {mealWeekData?.meals?.satietyRecords && mealWeekData.meals.satietyRecords.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-semibold text-gray-900 mb-4">Tokluk Geçmişi</h3>
+                    <div className="space-y-2">
+                      {mealWeekData.meals.satietyRecords.map((s) => (
+                        <div key={s._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${satietyMealColors[s.mealType] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                              {mealTypeIcons[s.mealType]} {mealTypeLabels[s.mealType] || s.mealType}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(s.date).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{satietyEmojis[s.satietyLevel - 1]}</span>
+                            <span className="text-sm font-medium text-gray-700">{satietyLabels[s.satietyLevel - 1]}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                  <h3 className="font-semibold text-gray-900 mb-4">Haftanın Öğünleri</h3>
+                  {mealWeekData?.meals?.items && mealWeekData.meals.items.length > 0 ? (
+                    <div className="space-y-3">
+                      {mealWeekData.meals.items.map((meal) => (
+                        <div key={meal._id} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{mealTypeIcons[meal.mealType] || "🍴"}</span>
+                              <span className="font-semibold text-gray-900 text-sm">{mealTypeLabels[meal.mealType] || meal.mealType}</span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(meal.date).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
+                              </span>
+                            </div>
+                            <span className="text-sm font-bold text-emerald-600">{meal.totalCalories} kcal</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {meal.items.map((f, i) => (
+                              <span key={i} className="text-xs px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-gray-600">
+                                {f.name}{f.portion ? ` (${f.portion})` : ""}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState message="Bu haftaya ait öğün kaydı yok." />
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* ── YILLIK GÖRÜNÜM ── */}
+            {mealViewMode === "yearly" && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard label="Toplam Öğün" value={mealYearData?.meals?.summary.totalMeals || 0} color="bg-emerald-50 text-emerald-600" icon="🍽️" />
+                  <StatCard label="Toplam Kalori" value={mealYearData?.meals?.summary.totalCalories || 0} sub="kcal" color="bg-orange-50 text-orange-600" icon="🔥" />
+                  <StatCard label="Ort. Kalori/Gün" value={mealYearData?.meals?.summary.avgCaloriesPerDay || 0} sub="kcal" color="bg-blue-50 text-blue-600" icon="📊" />
+                  <StatCard label="Kalori Hedefi" value={client.targetCalories} sub="kcal/gün" color="bg-gray-100 text-gray-600" icon="🎯" />
+                </div>
+
+                {monthlyCaloriesData.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="font-semibold text-gray-900">Aylık Kalori Alımı</h3>
+                      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                        <button
+                          onClick={() => setYearlyChartType("bar")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${yearlyChartType === "bar" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                          Sütun
+                        </button>
+                        <button
+                          onClick={() => setYearlyChartType("line")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${yearlyChartType === "line" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                          Çizgi
+                        </button>
+                      </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={260}>
+                      {yearlyChartType === "bar" ? (
+                        <BarChart data={monthlyCaloriesData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="date" fontSize={10} tick={{ fill: "#9ca3af" }} />
+                          <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
+                          <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                          <Bar dataKey="calories" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      ) : (
+                        <LineChart data={monthlyCaloriesData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="date" fontSize={10} tick={{ fill: "#9ca3af" }} />
+                          <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
+                          <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                          <Line type="monotone" dataKey="calories" stroke="#f59e0b" strokeWidth={2.5} dot={{ fill: "#f59e0b", r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      )}
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {mealYearData?.meals?.summary.byType && Object.keys(mealYearData.meals.summary.byType).length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-semibold text-gray-900 mb-4">Öğün Türlerine Göre (Yıllık)</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {Object.entries(mealYearData.meals.summary.byType).map(([type, data]) => (
+                        <div key={type} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <div className="text-2xl mb-2">{mealTypeIcons[type] || "🍴"}</div>
+                          <p className="font-semibold text-gray-900 text-sm">{mealTypeLabels[type] || type}</p>
+                          <p className="text-xs text-gray-500 mt-1">{data.count} öğün</p>
+                          <p className="text-xs text-emerald-600 font-medium mt-1">{data.calories} kcal</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {monthlyCaloriesData.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-semibold text-gray-900 mb-4">Aylık Özet</h3>
+                    <div className="space-y-2">
+                      {(() => {
+                        const maxCal = Math.max(...monthlyCaloriesData.map((x) => x.calories));
+                        return monthlyCaloriesData.map((m) => (
+                          <div key={m.date} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                            <span className="text-sm font-medium text-gray-700 w-24 capitalize shrink-0">{m.date}</span>
+                            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-amber-400 rounded-full transition-all"
+                                style={{ width: `${Math.round((m.calories / maxCal) * 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-bold text-amber-600 w-28 text-right shrink-0">{m.calories.toLocaleString("tr-TR")} kcal</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {monthlyCaloriesData.length === 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <EmptyState message={`${mealYear} yılına ait öğün kaydı yok.`} />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -1363,39 +1620,141 @@ export default function ClientProfilePage() {
         </div>
       )}
 
+      {/* Meal Plan Modal */}
+      {showMealPlanModal && (
+        <MealPlanModal
+          clientId={clientId}
+          onClose={() => setShowMealPlanModal(false)}
+          onSaved={() => setShowMealPlanModal(false)}
+        />
+      )}
+
       {/* Weight Modal */}
       {showWeightModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">⚖️ Kilo Güncelle</h3>
-              <button onClick={() => setShowWeightModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition">
-                ✕
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            {/* Gradient Header */}
+            <div className="relative bg-gradient-to-br from-emerald-500 to-teal-600 px-6 pt-6 pb-8">
+              <button
+                onClick={() => { setShowWeightModal(false); setWeightForm(""); }}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
               </button>
+
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="5" r="3"/>
+                    <path d="M6.5 8a2 2 0 00-1.905 1.46L2.1 18.5A2 2 0 004 21h16a2 2 0 001.925-2.54L19.4 9.46A2 2 0 0017.48 8z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-emerald-100 text-xs font-medium uppercase tracking-wider">Kilo Takibi</p>
+                  <h3 className="text-white text-xl font-bold">Güncelle</h3>
+                </div>
+              </div>
+
+              {/* Weight comparison */}
+              <div className="flex items-end gap-3">
+                <div>
+                  <p className="text-emerald-200 text-xs mb-1">Mevcut</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-white">{client.weight}</span>
+                    <span className="text-emerald-200 font-semibold">kg</span>
+                  </div>
+                </div>
+                {weightForm && parseFloat(weightForm) > 0 && (
+                  <>
+                    <div className="pb-2">
+                      <svg className="w-5 h-5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-emerald-200 text-xs mb-1">Yeni</p>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-black text-white">{parseFloat(weightForm).toFixed(1)}</span>
+                        <span className="text-emerald-200 font-semibold">kg</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Delta badge */}
+              {weightForm && parseFloat(weightForm) > 0 && parseFloat(weightForm) !== client.weight && (
+                <div className="mt-3">
+                  {(() => {
+                    const diff = parseFloat(weightForm) - client.weight;
+                    const isDown = diff < 0;
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${isDown ? "bg-white/20 text-white" : "bg-amber-400/30 text-amber-100"}`}>
+                        <span>{isDown ? "↓" : "↑"}</span>
+                        <span>{Math.abs(diff).toFixed(1)} kg {isDown ? "azalma" : "artış"}</span>
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
-            <div className="p-6 space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl flex items-center justify-between">
-                <span className="text-sm text-gray-500">Mevcut kilo</span>
-                <span className="text-lg font-bold text-gray-900">{client.weight} kg</span>
-              </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Weight journey progress */}
+              {client.startWeight !== client.targetWeight && (
+                <div className="bg-gray-50 rounded-2xl p-3.5">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                    <span>Başlangıç <span className="font-semibold text-gray-700">{client.startWeight} kg</span></span>
+                    <span>Hedef <span className="font-semibold text-emerald-600">{client.targetWeight} kg</span></span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-linear-to-r from-emerald-400 to-teal-400 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, Math.max(0,
+                          ((client.startWeight - client.weight) / (client.startWeight - client.targetWeight)) * 100
+                        ))}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Input */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Yeni Kilo (kg)</label>
-                <input
-                  type="number" step="0.1" value={weightForm}
-                  onChange={(e) => setWeightForm(e.target.value)}
-                  placeholder="82.5" autoFocus
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
-                />
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Yeni Kilo</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={weightForm}
+                    onChange={(e) => setWeightForm(e.target.value)}
+                    placeholder={String(client.weight)}
+                    autoFocus
+                    className="w-full pl-5 pr-14 py-4 border-2 border-gray-100 rounded-2xl text-2xl font-bold text-gray-900 bg-gray-50 focus:outline-none focus:border-emerald-400 focus:bg-white transition-all"
+                  />
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">kg</span>
+                </div>
               </div>
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowWeightModal(false)}
-                  className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition">
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowWeightModal(false); setWeightForm(""); }}
+                  className="flex-1 py-3.5 border-2 border-gray-100 text-gray-500 rounded-2xl text-sm font-semibold hover:border-gray-200 hover:bg-gray-50 transition-all"
+                >
                   İptal
                 </button>
                 <button
                   onClick={() => { handleUpdateWeight(); setShowWeightModal(false); }}
-                  className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition">
-                  Güncelle
+                  disabled={!weightForm || parseFloat(weightForm) <= 0}
+                  className="flex-1 py-3.5 bg-linear-to-r from-emerald-500 to-teal-500 text-white rounded-2xl text-sm font-bold hover:from-emerald-600 hover:to-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
+                >
+                  Kaydet
                 </button>
               </div>
             </div>

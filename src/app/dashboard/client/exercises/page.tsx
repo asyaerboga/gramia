@@ -468,13 +468,6 @@ export default function ExercisesPage() {
           {/* Aksiyon bar */}
           <div className="relative z-10 mt-5 flex flex-wrap gap-2 items-center">
             <DatePickerModern value={selectedDate} onChange={setSelectedDate} />
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-5 py-2 bg-white text-purple-700 font-semibold rounded-xl hover:bg-purple-50 transition-all text-sm shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <FaPlus className="text-purple-500" />
-              <span>Egzersiz Ekle</span>
-            </button>
           </div>
         </div>
 
@@ -762,6 +755,12 @@ export default function ExercisesPage() {
                   </div>
                 );
               })}
+              <button
+                onClick={() => setShowForm(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-violet-200 text-violet-500 hover:border-violet-400 hover:bg-violet-50 rounded-2xl font-semibold text-sm transition-all"
+              >
+                <FaPlus /> Egzersiz Ekle
+              </button>
             </div>
           )}
         </div>
