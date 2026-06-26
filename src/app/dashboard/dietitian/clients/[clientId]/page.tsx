@@ -7,6 +7,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import MannequinChart from "@/components/client/MannequinChart";
 import CalorieBar from "@/components/client/CalorieBar";
 import GoalProgressBar from "@/components/client/GoalProgressBar";
+import MeasurementHistoryTable from "@/components/shared/MeasurementHistoryTable";
 import {
   LineChart,
   Line,
@@ -296,7 +297,10 @@ export default function ClientProfilePage() {
   const [measurements, setMeasurements] = useState<MeasurementRecord[]>([]);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<keyof Regions>("waist");
+  const [measurementView, setMeasurementView] = useState<"chart" | "history">("chart");
+  const [selectedMeasurementId, setSelectedMeasurementId] = useState<string | null>(null);
   const [showMeasurementForm, setShowMeasurementForm] = useState(false);
+  const [editingMeasurementId, setEditingMeasurementId] = useState<string | null>(null);
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [measurementForm, setMeasurementForm] = useState<Regions>({
@@ -305,6 +309,7 @@ export default function ClientProfilePage() {
   const [measurementWeight, setMeasurementWeight] = useState("");
   const [measurementHeight, setMeasurementHeight] = useState("");
   const [weightForm, setWeightForm] = useState("");
+  const [targetWeightForm, setTargetWeightForm] = useState("");
 
   const [healthTab, setHealthTab] = useState<"diseases" | "blood">("diseases");
   const [chronicDiseases, setChronicDiseases] = useState<string[]>([]);
@@ -497,48 +502,88 @@ export default function ClientProfilePage() {
     }
   };
 
-  const handleAddMeasurement = async (e: React.FormEvent) => {
+  const handleSaveMeasurement = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/measurements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId,
-          date: new Date().toISOString(),
-          regions: measurementForm,
-          ...(measurementWeight && { weight: parseFloat(measurementWeight) }),
-          ...(measurementHeight && { height: parseFloat(measurementHeight) }),
-        }),
-      });
+      const body = {
+        regions: measurementForm,
+        weight: measurementWeight ? parseFloat(measurementWeight) : null,
+        height: measurementHeight ? parseFloat(measurementHeight) : null,
+      };
+      const res = editingMeasurementId
+        ? await fetch(`/api/measurements/${editingMeasurementId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+        : await fetch("/api/measurements", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...body, clientId, date: new Date().toISOString() }),
+          });
       if (res.ok) {
         setShowMeasurementForm(false);
+        setEditingMeasurementId(null);
         setMeasurementWeight("");
         setMeasurementHeight("");
         fetchMeasurements();
+        fetchClient();
       }
     } catch (error) {
-      console.error("Failed to add measurement:", error);
+      console.error("Failed to save measurement:", error);
+    }
+  };
+
+  const handleEditMeasurement = (measurement: MeasurementRecord) => {
+    setEditingMeasurementId(measurement._id);
+    setMeasurementForm(measurement.regions);
+    setMeasurementWeight(measurement.weight != null ? String(measurement.weight) : "");
+    setMeasurementHeight(measurement.height != null ? String(measurement.height) : "");
+    setShowMeasurementForm(true);
+  };
+
+  const handleDeleteMeasurement = async (measurement: MeasurementRecord) => {
+    const label = new Date(measurement.date).toLocaleDateString("tr-TR");
+    if (!window.confirm(`${label} tarihli ölçüm kaydı silinsin mi?`)) return;
+    try {
+      const res = await fetch(`/api/measurements/${measurement._id}`, { method: "DELETE" });
+      if (res.ok) {
+        if (selectedMeasurementId === measurement._id) setSelectedMeasurementId(null);
+        fetchMeasurements();
+        fetchClient();
+      }
+    } catch (error) {
+      console.error("Failed to delete measurement:", error);
     }
   };
 
   const handleUpdateWeight = async () => {
-    const weight = parseFloat(weightForm);
-    if (!weight) return;
+    const weight = weightForm ? parseFloat(weightForm) : undefined;
+    const targetWeight = targetWeightForm ? parseFloat(targetWeightForm) : undefined;
+    if (!weight && !targetWeight) return;
     try {
       const res = await fetch(`/api/dietitian/clients/${clientId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weight }),
+        body: JSON.stringify({ weight, targetWeight }),
       });
-      if (res.ok) { setWeightForm(""); setShowWeightModal(false); fetchClient(); fetchMeasurements(); }
+      if (res.ok) {
+        setWeightForm("");
+        setTargetWeightForm("");
+        setShowWeightModal(false);
+        fetchClient();
+        fetchMeasurements();
+      }
     } catch (error) {
       console.error("Failed to update weight:", error);
     }
   };
 
   const latestMeasurement = measurements[measurements.length - 1];
-  const regions = latestMeasurement?.regions || { neck: 0, chest: 0, waist: 0, hip: 0, arm: 0, thigh: 0, calf: 0 };
+  const displayedMeasurement = selectedMeasurementId
+    ? measurements.find((m) => m._id === selectedMeasurementId) || latestMeasurement
+    : latestMeasurement;
+  const regions = displayedMeasurement?.regions || { neck: 0, chest: 0, waist: 0, hip: 0, arm: 0, thigh: 0, calf: 0 };
 
   const chartData = measurements.map((m) => ({
     date: new Date(m.date).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }),
@@ -663,7 +708,10 @@ export default function ClientProfilePage() {
                 🩸 Kan & Hastalıklar
               </button>
               <button
-                onClick={() => setShowWeightModal(true)}
+                onClick={() => {
+                  setTargetWeightForm(String(client.targetWeight));
+                  setShowWeightModal(true);
+                }}
                 className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-sm font-semibold hover:from-emerald-600 hover:to-teal-600 transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:-translate-y-0.5 active:translate-y-0"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -748,19 +796,23 @@ export default function ClientProfilePage() {
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-gray-900">Vücut Ölçümleri</h3>
-                    <select
-                      value={selectedRegion}
-                      onChange={(e) => setSelectedRegion(e.target.value as keyof Regions)}
-                      className="select-modern"
-                    >
-                      {Object.entries(regionLabels).map(([key, label]) => (
-                        <option key={key} value={key}>{label}</option>
-                      ))}
-                    </select>
+                    {measurementView === "chart" && (
+                      <select
+                        value={selectedRegion}
+                        onChange={(e) => setSelectedRegion(e.target.value as keyof Regions)}
+                        className="select-modern"
+                      >
+                        {Object.entries(regionLabels).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <button
                     onClick={() => {
                       const latest = measurements[measurements.length - 1];
+                      setEditingMeasurementId(null);
+                      setMeasurementForm({ neck: 0, chest: 0, waist: 0, hip: 0, arm: 0, thigh: 0, calf: 0 });
                       setMeasurementWeight(latest?.weight != null ? String(latest.weight) : "");
                       setMeasurementHeight(latest?.height != null ? String(latest.height) : "");
                       setShowMeasurementForm(true);
@@ -770,20 +822,50 @@ export default function ClientProfilePage() {
                     + Ölçüm Ekle
                   </button>
                 </div>
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
-                      <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
-                      />
-                      <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} dot={{ fill: "#10b981", r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+
+                <div className="flex gap-1 mb-4 bg-gray-50 rounded-lg p-1 w-fit">
+                  <button
+                    onClick={() => setMeasurementView("chart")}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                      measurementView === "chart" ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                    }`}
+                  >
+                    Grafik
+                  </button>
+                  <button
+                    onClick={() => setMeasurementView("history")}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                      measurementView === "history" ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                    }`}
+                  >
+                    Geçmiş
+                  </button>
+                </div>
+
+                {measurementView === "chart" ? (
+                  chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="date" fontSize={11} tick={{ fill: "#9ca3af" }} />
+                        <YAxis fontSize={11} tick={{ fill: "#9ca3af" }} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
+                        />
+                        <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} dot={{ fill: "#10b981", r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState message="Henüz ölçüm verisi yok." />
+                  )
                 ) : (
-                  <EmptyState message="Henüz ölçüm verisi yok." />
+                  <MeasurementHistoryTable
+                    measurements={measurements}
+                    selectedId={selectedMeasurementId}
+                    onSelectMeasurement={(m) => setSelectedMeasurementId(m._id)}
+                    onEditMeasurement={handleEditMeasurement}
+                    onDeleteMeasurement={handleDeleteMeasurement}
+                  />
                 )}
               </div>
             </div>
@@ -1415,12 +1497,12 @@ export default function ClientProfilePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">Yeni Ölçüm Ekle</h3>
-              <button onClick={() => setShowMeasurementForm(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition">
+              <h3 className="font-bold text-gray-900">{editingMeasurementId ? "Ölçümü Düzenle" : "Yeni Ölçüm Ekle"}</h3>
+              <button onClick={() => { setShowMeasurementForm(false); setEditingMeasurementId(null); }} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition">
                 ✕
               </button>
             </div>
-            <form onSubmit={handleAddMeasurement} className="p-6 space-y-5">
+            <form onSubmit={handleSaveMeasurement} className="p-6 space-y-5">
               <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100">
                 <div>
                   <label className="block text-xs font-semibold text-blue-600 mb-1.5">Kilo (kg)</label>
@@ -1455,7 +1537,7 @@ export default function ClientProfilePage() {
                 ))}
               </div>
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowMeasurementForm(false)}
+                <button type="button" onClick={() => { setShowMeasurementForm(false); setEditingMeasurementId(null); }}
                   className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition">
                   İptal
                 </button>
@@ -1636,7 +1718,7 @@ export default function ClientProfilePage() {
             {/* Gradient Header */}
             <div className="relative bg-gradient-to-br from-emerald-500 to-teal-600 px-6 pt-6 pb-8">
               <button
-                onClick={() => { setShowWeightModal(false); setWeightForm(""); }}
+                onClick={() => { setShowWeightModal(false); setWeightForm(""); setTargetWeightForm(""); }}
                 className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -1740,18 +1822,34 @@ export default function ClientProfilePage() {
                 </div>
               </div>
 
+              {/* Target weight input */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Hedef Kilo</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={targetWeightForm}
+                    onChange={(e) => setTargetWeightForm(e.target.value)}
+                    placeholder={String(client.targetWeight)}
+                    className="w-full pl-5 pr-14 py-3 border-2 border-gray-100 rounded-2xl text-lg font-bold text-gray-900 bg-gray-50 focus:outline-none focus:border-emerald-400 focus:bg-white transition-all"
+                  />
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">kg</span>
+                </div>
+              </div>
+
               {/* Actions */}
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => { setShowWeightModal(false); setWeightForm(""); }}
+                  onClick={() => { setShowWeightModal(false); setWeightForm(""); setTargetWeightForm(""); }}
                   className="flex-1 py-3.5 border-2 border-gray-100 text-gray-500 rounded-2xl text-sm font-semibold hover:border-gray-200 hover:bg-gray-50 transition-all"
                 >
                   İptal
                 </button>
                 <button
                   onClick={() => { handleUpdateWeight(); setShowWeightModal(false); }}
-                  disabled={!weightForm || parseFloat(weightForm) <= 0}
+                  disabled={(!weightForm || parseFloat(weightForm) <= 0) && (!targetWeightForm || parseFloat(targetWeightForm) <= 0)}
                   className="flex-1 py-3.5 bg-linear-to-r from-emerald-500 to-teal-500 text-white rounded-2xl text-sm font-bold hover:from-emerald-600 hover:to-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
                 >
                   Kaydet

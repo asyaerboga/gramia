@@ -40,10 +40,9 @@ export async function GET(request: Request) {
     const query: Record<string, unknown> = { clientId };
 
     if (dateParam) {
-      const date = new Date(dateParam);
-      date.setHours(0, 0, 0, 0);
-      const nextDay = new Date(date);
-      nextDay.setDate(nextDay.getDate() + 1);
+      const date = new Date(dateParam + "T00:00:00.000Z");
+      const nextDay = new Date(dateParam + "T00:00:00.000Z");
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
       query.date = { $gte: date, $lt: nextDay };
     }
 
@@ -87,7 +86,7 @@ export async function POST(request: Request) {
     }
 
     const mealDate = date ? new Date(date) : new Date();
-    mealDate.setHours(12, 0, 0, 0);
+    mealDate.setUTCHours(12, 0, 0, 0);
 
     const meal = await Meal.create({
       clientId: client._id,

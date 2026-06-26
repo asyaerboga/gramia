@@ -20,16 +20,27 @@ export default function GoalProgressBar({
   currentWeight,
   targetWeight,
 }: GoalProgressBarProps) {
+  const isGain = targetWeight > startWeight;
   const totalChange = startWeight - targetWeight;
   const change = startWeight - currentWeight;
   const percentage =
     totalChange !== 0
       ? Math.min(Math.max((change / totalChange) * 100, 0), 100)
       : 0;
-  const remaining = Math.max(0, currentWeight - targetWeight);
-  const lost = Math.max(0, startWeight - currentWeight);
-  const isCompleted = totalChange > 0 && currentWeight <= targetWeight;
+  const remaining = Math.max(
+    0,
+    isGain ? targetWeight - currentWeight : currentWeight - targetWeight
+  );
+  const lost = Math.max(
+    0,
+    isGain ? currentWeight - startWeight : startWeight - currentWeight
+  );
+  const isCompleted = isGain
+    ? totalChange !== 0 && currentWeight >= targetWeight
+    : totalChange > 0 && currentWeight <= targetWeight;
   const motivation = getMotivation(percentage);
+  const lostLabel = isGain ? "alındı" : "verildi";
+  const lostIcon = isGain ? "📈" : "📉";
 
   if (isCompleted) {
     return (
@@ -39,7 +50,7 @@ export default function GoalProgressBar({
           <div className="text-6xl mb-3 inline-block animate-bounce">🏆</div>
           <h4 className="text-xl font-black mb-1">Hedefe Ulaştın!</h4>
           <p className="text-emerald-100 text-sm mb-4">
-            {startWeight} kg → {currentWeight} kg · {lost.toFixed(1)} kg verdin
+            {startWeight} kg → {currentWeight} kg · {lost.toFixed(1)} kg {isGain ? "aldın" : "verdin"}
           </p>
           <div className="bg-white/20 rounded-full h-3 w-full overflow-hidden">
             <div className="bg-white h-3 rounded-full w-full shadow-[0_0_12px_rgba(255,255,255,0.6)]" />
@@ -139,10 +150,10 @@ export default function GoalProgressBar({
       {/* Stat chips */}
       <div className="grid grid-cols-2 gap-2.5">
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2.5">
-          <span className="text-2xl">📉</span>
+          <span className="text-2xl">{lostIcon}</span>
           <div>
             <p className="text-base font-black text-emerald-700 leading-none">{lost.toFixed(1)} kg</p>
-            <p className="text-xs text-emerald-500 mt-0.5">verildi</p>
+            <p className="text-xs text-emerald-500 mt-0.5">{lostLabel}</p>
           </div>
         </div>
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-center gap-2.5">

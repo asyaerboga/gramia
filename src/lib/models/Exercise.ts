@@ -9,6 +9,7 @@ export interface IExercise extends Document {
   caloriesBurned?: number;
   intensity: "low" | "medium" | "high";
   notes?: string;
+  fromProgram?: boolean;
   createdAt: Date;
 }
 
@@ -30,6 +31,7 @@ const ExerciseSchema = new Schema<IExercise>(
       default: "medium",
     },
     notes: { type: String },
+    fromProgram: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

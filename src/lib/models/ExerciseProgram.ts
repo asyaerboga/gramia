@@ -13,11 +13,17 @@ export interface IDayProgram {
   exercises: IProgramExercise[];
 }
 
+export interface IExerciseCompletion {
+  date: string; // "YYYY-MM-DD"
+  name: string; // tamamlanan egzersizin adı
+}
+
 export interface IExerciseProgram extends Document {
   clientId: Types.ObjectId;
   name: string;
   days: IDayProgram[];
-  completions: string[]; // "YYYY-MM-DD" - tamamlanan günlerin tarihleri
+  completions: string[]; // "YYYY-MM-DD" - tüm program tamamlanan günlerin tarihleri
+  exerciseCompletions: IExerciseCompletion[]; // gün içinde tek tek tamamlanan egzersizler
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,12 +47,21 @@ const DayProgramSchema = new Schema<IDayProgram>(
   { _id: false },
 );
 
+const ExerciseCompletionSchema = new Schema<IExerciseCompletion>(
+  {
+    date: { type: String, required: true },
+    name: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const ExerciseProgramSchema = new Schema<IExerciseProgram>(
   {
     clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true, unique: true },
     name: { type: String, required: true, default: "Haftalık Programım" },
     days: [DayProgramSchema],
     completions: [{ type: String }],
+    exerciseCompletions: [ExerciseCompletionSchema],
   },
   { timestamps: true },
 );

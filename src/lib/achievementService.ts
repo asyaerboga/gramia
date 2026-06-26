@@ -7,6 +7,7 @@ import Message from "@/lib/models/Message";
 import Meal from "@/lib/models/Meal";
 import CheckIn from "@/lib/models/CheckIn";
 import WaterIntake from "@/lib/models/WaterIntake";
+import { WEIGHT_GOAL_TOLERANCE_KG } from "@/lib/constants";
 
 function toKey(date: Date): string {
   return date.toISOString().split("T")[0];
@@ -75,20 +76,72 @@ export async function checkAndAwardAchievements(
     if (streak >= 100) await tryAward("streak_100", 500);
 
     /* ── Weight progress ──────────────────────────── */
+    // Hedef yönü: hedef kilo başlangıçtan belirgin şekilde düşükse "verme",
+    // belirgin şekilde yüksekse "alma", aksi halde "koruma" hedefi sayılır.
     const startW = client.startWeight ?? client.weight;
     const curW = client.weight;
+    const targetW = client.targetWeight;
+    const isGainGoal =
+      startW != null && targetW != null && targetW > startW + WEIGHT_GOAL_TOLERANCE_KG;
+    const isLoseGoal =
+      startW != null && targetW != null && targetW < startW - WEIGHT_GOAL_TOLERANCE_KG;
+    const isMaintainGoal = !isGainGoal && !isLoseGoal;
+
     if (startW && curW) {
-      const lost = startW - curW;
-      if (lost >= 1) await tryAward("weight_lost_1", 25);
-      if (lost >= 5) await tryAward("weight_lost_5", 100);
-      if (lost >= 10) await tryAward("weight_lost_10", 250);
+      if (isLoseGoal) {
+        const lost = startW - curW;
+        if (lost >= 1) await tryAward("weight_lost_1", 25);
+        if (lost >= 5) await tryAward("weight_lost_5", 100);
+        if (lost >= 10) await tryAward("weight_lost_10", 250);
+      } else if (isGainGoal) {
+        const gained = curW - startW;
+        if (gained >= 1) await tryAward("weight_gained_1", 25);
+        if (gained >= 5) await tryAward("weight_gained_5", 100);
+        if (gained >= 10) await tryAward("weight_gained_10", 250);
+      }
     }
-    if (
-      client.weight &&
-      client.targetWeight &&
-      client.weight <= client.targetWeight
-    ) {
-      await tryAward("goal_reached", ACHIEVEMENT_DEFINITIONS.GOAL_REACHED.points);
+    if (curW && targetW) {
+      const goalReached = isGainGoal
+        ? curW >= targetW
+        : isMaintainGoal
+          ? Math.abs(curW - targetW) <= WEIGHT_GOAL_TOLERANCE_KG
+          : curW <= targetW;
+      if (goalReached) {
+        await tryAward("goal_reached", ACHIEVEMENT_DEFINITIONS.GOAL_REACHED.points);
+      }
+    }
+
+    /* ── Weight maintenance streak (koruma hedefi) ─── */
+    if (isMaintainGoal && targetW) {
+      const maintainCutoff = new Date();
+      maintainCutoff.setDate(maintainCutoff.getDate() - 30);
+      maintainCutoff.setHours(0, 0, 0, 0);
+
+      const weightMeasurements = await Measurement.find({
+        clientId,
+        date: { $gte: maintainCutoff },
+        weight: { $exists: true, $ne: null },
+      })
+        .select("date weight")
+        .sort({ date: 1 });
+
+      if (weightMeasurements.length > 0) {
+        const allWithinRange = weightMeasurements.every(
+          (m) =>
+            m.weight != null &&
+            Math.abs(m.weight - targetW) <= WEIGHT_GOAL_TOLERANCE_KG,
+        );
+        const daysTracked = Math.floor(
+          (Date.now() - new Date(weightMeasurements[0].date).getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        if (allWithinRange && daysTracked >= 14) {
+          await tryAward("weight_maintained_14", 75);
+        }
+        if (allWithinRange && daysTracked >= 30) {
+          await tryAward("weight_maintained_30", 250);
+        }
+      }
     }
 
     /* ── Exercise count ───────────────────────────── */

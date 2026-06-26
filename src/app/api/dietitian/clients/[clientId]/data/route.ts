@@ -10,6 +10,7 @@ import Meal from "@/lib/models/Meal";
 import MealSatiety from "@/lib/models/MealSatiety";
 import WaterIntake from "@/lib/models/WaterIntake";
 import Achievement, { ACHIEVEMENT_DEFINITIONS } from "@/lib/models/Achievement";
+import { checkAndAwardAchievements } from "@/lib/achievementService";
 
 // GET /api/dietitian/clients/[clientId]/data - Get all client data for dietitian
 export async function GET(
@@ -211,6 +212,10 @@ export async function GET(
 
     // Achievements
     if (category === "all" || category === "achievements") {
+      // Görüntülenen her seferinde yeniden hesapla: kilo/su/seri gibi koşullar
+      // başka bir route üzerinden gerçekleşmiş olabilir ve henüz kontrol edilmemiş olabilir.
+      await checkAndAwardAchievements(clientId).catch(console.error);
+
       const achievements = await Achievement.find({ clientId }).sort({
         unlockedAt: -1,
       });

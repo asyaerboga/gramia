@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import DatePickerModern from "@/components/shared/DatePickerModern";
+import TimePickerModern from "@/components/shared/TimePickerModern";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/providers/ToastProvider";
 import { FaMoon, FaSun, FaCheckCircle } from "react-icons/fa";
@@ -434,22 +435,36 @@ export default function WellnessPage() {
                     <p className="text-sm text-gray-400">Diyetisyeniniz henüz kan tahlili yüklememiş.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
                     {bloodTests.map((bt) => (
-                      <button
-                        key={bt._id}
-                        onClick={() => setLightboxUrl(bt.imageUrl)}
-                        className="group text-left rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={bt.imageUrl} alt={bt.originalName} className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-200" />
-                        <div className="p-2 bg-gray-50">
-                          <p className="text-xs text-gray-600 font-medium">
-                            {new Date(bt.testDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}
+                      <div key={bt._id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                        {bt.imageUrl.toLowerCase().endsWith(".pdf") ? (
+                          <a
+                            href={bt.imageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 w-12 h-12 bg-red-50 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-red-100 transition"
+                          >
+                            <span className="text-xl">📄</span>
+                          </a>
+                        ) : (
+                          <button onClick={() => setLightboxUrl(bt.imageUrl)} className="shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={bt.imageUrl}
+                              alt={bt.originalName}
+                              className="w-12 h-12 object-cover rounded-xl border border-gray-200 hover:opacity-80 transition"
+                            />
+                          </button>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{bt.originalName}</p>
+                          <p className="text-xs text-gray-400">
+                            {new Date(bt.testDate).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
                           </p>
-                          {bt.notes && <p className="text-[10px] text-gray-400 truncate">{bt.notes}</p>}
+                          {bt.notes && <p className="text-xs text-gray-400 truncate">{bt.notes}</p>}
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -638,11 +653,10 @@ export default function WellnessPage() {
                     <FaMoon className="text-indigo-300 text-xs" />
                     <span className="text-indigo-300 text-[10px] font-bold uppercase tracking-widest">Yatış</span>
                   </div>
-                  <input
-                    type="time"
+                  <TimePickerModern
                     value={sleepForm.bedTime}
-                    onChange={(e) => setSleepForm({ ...sleepForm, bedTime: e.target.value })}
-                    className="bg-transparent text-white text-3xl font-bold w-full focus:outline-none scheme-dark"
+                    onChange={(v) => setSleepForm({ ...sleepForm, bedTime: v })}
+                    accent="indigo"
                   />
                 </div>
                 <div className="bg-white/5 p-5 hover:bg-white/10 transition-colors">
@@ -650,11 +664,10 @@ export default function WellnessPage() {
                     <FaSun className="text-yellow-300 text-xs" />
                     <span className="text-indigo-300 text-[10px] font-bold uppercase tracking-widest">Uyanış</span>
                   </div>
-                  <input
-                    type="time"
+                  <TimePickerModern
                     value={sleepForm.wakeTime}
-                    onChange={(e) => setSleepForm({ ...sleepForm, wakeTime: e.target.value })}
-                    className="bg-transparent text-white text-3xl font-bold w-full focus:outline-none scheme-dark"
+                    onChange={(v) => setSleepForm({ ...sleepForm, wakeTime: v })}
+                    accent="amber"
                   />
                 </div>
               </div>

@@ -43,10 +43,9 @@ export async function GET(request: Request) {
     const query: any = { clientId: targetClientId };
 
     if (date) {
-      const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-      const nextDay = new Date(d);
-      nextDay.setDate(nextDay.getDate() + 1);
+      const d = new Date(date + "T00:00:00.000Z");
+      const nextDay = new Date(date + "T00:00:00.000Z");
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
       query.date = { $gte: d, $lt: nextDay };
     }
 
@@ -100,8 +99,9 @@ export async function POST(request: Request) {
     if (duration < 0) duration += 24 * 60; // Gece yarısını geçtiyse
     duration = Math.round((duration / 60) * 10) / 10; // Saat cinsinden
 
-    const sleepDate = date ? new Date(date) : new Date();
-    sleepDate.setHours(0, 0, 0, 0);
+    const sleepDate = date
+      ? new Date(date + "T00:00:00.000Z")
+      : (() => { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d; })();
 
     // Upsert: varsa güncelle, yoksa oluştur
     const sleep = await Sleep.findOneAndUpdate(

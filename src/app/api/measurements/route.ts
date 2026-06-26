@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Measurement from "@/lib/models/Measurement";
 import Client from "@/lib/models/Client";
+import { checkAndAwardAchievements } from "@/lib/achievementService";
 
 // GET /api/measurements - Get measurements
 export async function GET(request: Request) {
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
       const updateFields: Record<string, number> = { weight };
       if (height != null) updateFields.height = height;
       await Client.findByIdAndUpdate(clientId, { $set: updateFields });
+      await checkAndAwardAchievements(clientId).catch(console.error);
     } else if (height != null) {
       await Client.findByIdAndUpdate(clientId, { $set: { height } });
     }

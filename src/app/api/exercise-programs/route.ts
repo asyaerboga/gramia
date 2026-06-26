@@ -60,17 +60,28 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH /api/exercise-programs - Günü tamamla: egzersizleri kaydet + completion ekle
+// PATCH /api/exercise-programs - Günü veya tek bir egzersizi tamamla
 export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
 
     const body = await request.json();
-    const { date, dayOfWeek, justMark } = body as { date: string; dayOfWeek: number; justMark?: boolean };
+    const { date, dayOfWeek, justMark, exerciseName } = body as {
+      date: string;
+      dayOfWeek: number;
+      justMark?: boolean;
+      exerciseName?: string;
+    };
 
     if (!date || dayOfWeek === undefined) {
       return NextResponse.json({ error: "date ve dayOfWeek gereklidir" }, { status: 400 });
+    }
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    if (date !== todayStr) {
+      return NextResponse.json({ error: "Sadece bugünün programı tamamlanabilir" }, { status: 400 });
     }
 
     await dbConnect();
@@ -80,6 +91,54 @@ export async function PATCH(request: Request) {
     const program = await ExerciseProgram.findOne({ clientId: client._id });
     if (!program) return NextResponse.json({ error: "Program bulunamadı" }, { status: 404 });
 
+    const dayProgram = program.days.find((d) => d.dayOfWeek === dayOfWeek);
+    const exerciseDate = new Date(date);
+    exerciseDate.setHours(12, 0, 0, 0);
+
+    // Tek bir egzersizi tikle/tikten çıkar
+    if (exerciseName) {
+      const exercise = dayProgram?.exercises.find((e) => e.name === exerciseName);
+      if (!exercise) {
+        return NextResponse.json({ error: "Egzersiz bulunamadı" }, { status: 404 });
+      }
+
+      const wasCompleted = program.exerciseCompletions.some((c) => c.date === date && c.name === exerciseName);
+
+      if (wasCompleted) {
+        program.exerciseCompletions = program.exerciseCompletions.filter(
+          (c) => !(c.date === date && c.name === exerciseName),
+        );
+        program.completions = program.completions.filter((d) => d !== date);
+        await Exercise.deleteOne({ clientId: client._id, name: exerciseName, date: exerciseDate, fromProgram: true });
+      } else {
+        program.exerciseCompletions.push({ date, name: exerciseName });
+        await Exercise.create({
+          clientId: client._id,
+          date: exerciseDate,
+          type: exercise.type,
+          name: exercise.name,
+          duration: exercise.duration,
+          caloriesBurned: exercise.caloriesBurned ?? Math.round(exercise.duration * 5),
+          intensity: "medium",
+          notes: exercise.notes,
+          fromProgram: true,
+        });
+
+        const allDone = dayProgram!.exercises.every((e) =>
+          program.exerciseCompletions.some((c) => c.date === date && c.name === e.name),
+        );
+        if (allDone && !program.completions.includes(date)) {
+          program.completions.push(date);
+        }
+      }
+
+      await program.save();
+      if (!wasCompleted && program.completions.includes(date)) {
+        await checkAndAwardAchievements(client._id.toString()).catch(console.error);
+      }
+      return NextResponse.json(program);
+    }
+
     // Zaten tamamlandıysa tekrar kaydetme
     if (program.completions.includes(date)) {
       return NextResponse.json(program);
@@ -87,27 +146,31 @@ export async function PATCH(request: Request) {
 
     if (!justMark) {
       // İlgili günün egzersizlerini bul
-      const dayProgram = program.days.find((d) => d.dayOfWeek === dayOfWeek);
       if (!dayProgram || dayProgram.exercises.length === 0) {
         return NextResponse.json({ error: "Bu gün için program egzersizi yok" }, { status: 400 });
       }
 
-      // Egzersizleri Exercise koleksiyonuna kaydet
-      const exerciseDate = new Date(date);
-      exerciseDate.setHours(12, 0, 0, 0);
-
-      await Exercise.insertMany(
-        dayProgram.exercises.map((ex) => ({
-          clientId: client._id,
-          date: exerciseDate,
-          type: ex.type,
-          name: ex.name,
-          duration: ex.duration,
-          caloriesBurned: ex.caloriesBurned ?? Math.round(ex.duration * 5),
-          intensity: "medium",
-          notes: ex.notes,
-        })),
+      // Henüz tek tek tiklenmemiş egzersizleri Exercise koleksiyonuna kaydet
+      const pendingExercises = dayProgram.exercises.filter(
+        (ex) => !program.exerciseCompletions.some((c) => c.date === date && c.name === ex.name),
       );
+
+      if (pendingExercises.length > 0) {
+        await Exercise.insertMany(
+          pendingExercises.map((ex) => ({
+            clientId: client._id,
+            date: exerciseDate,
+            type: ex.type,
+            name: ex.name,
+            duration: ex.duration,
+            caloriesBurned: ex.caloriesBurned ?? Math.round(ex.duration * 5),
+            intensity: "medium",
+            notes: ex.notes,
+            fromProgram: true,
+          })),
+        );
+        pendingExercises.forEach((ex) => program.exerciseCompletions.push({ date, name: ex.name }));
+      }
     }
 
     // Completion tarihini ekle

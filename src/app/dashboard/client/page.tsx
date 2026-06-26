@@ -135,7 +135,9 @@ export default function ClientDashboard() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch("/api/client/daily-summary", { cache: "no-store" });
+      const d = new Date();
+      const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const res = await fetch(`/api/client/daily-summary?date=${localDate}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setSummary(data);
@@ -174,10 +176,12 @@ export default function ClientDashboard() {
 
   const handleWaterUpdate = async (amount: number) => {
     try {
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const res = await fetch("/api/water-intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, date: localDate }),
       });
       if (res.ok) {
         setSummary((prev) => ({

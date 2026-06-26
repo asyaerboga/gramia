@@ -55,6 +55,45 @@ export const ACHIEVEMENT_DEFINITIONS = {
     points: 1000,
   },
 
+  // Kilo alma hedefleri
+  WEIGHT_GAINED_1: {
+    id: "weight_gained_1",
+    name: "İlk Kazanım",
+    description: "İlk 1 kg'ı aldın",
+    icon: "📈",
+    points: 25,
+  },
+  WEIGHT_GAINED_5: {
+    id: "weight_gained_5",
+    name: "Güçleniyorsun",
+    description: "5 kg aldın",
+    icon: "🔼",
+    points: 100,
+  },
+  WEIGHT_GAINED_10: {
+    id: "weight_gained_10",
+    name: "Güçlü Dönüşüm",
+    description: "10 kg aldın",
+    icon: "🚀",
+    points: 250,
+  },
+
+  // Kilo koruma hedefleri
+  WEIGHT_MAINTAINED_14: {
+    id: "weight_maintained_14",
+    name: "Denge Ustası",
+    description: "14 gün boyunca kilonu hedef aralığında tuttun",
+    icon: "⚖️",
+    points: 75,
+  },
+  WEIGHT_MAINTAINED_30: {
+    id: "weight_maintained_30",
+    name: "Sarsılmaz Denge",
+    description: "30 gün boyunca kilonu hedef aralığında tuttun",
+    icon: "🛡️",
+    points: 250,
+  },
+
   // Su takibi
   WATER_DAILY: {
     id: "water_daily",

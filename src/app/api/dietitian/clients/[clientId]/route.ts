@@ -6,6 +6,7 @@ import Client from "@/lib/models/Client";
 import Meal from "@/lib/models/Meal";
 import Measurement from "@/lib/models/Measurement";
 import mongoose from "mongoose";
+import { checkAndAwardAchievements } from "@/lib/achievementService";
 
 // GET /api/dietitian/clients/[clientId] - Get client profile
 export async function GET(
@@ -160,6 +161,8 @@ export async function PATCH(
         },
         { upsert: true }
       );
+
+      await checkAndAwardAchievements(clientId).catch(console.error);
     }
 
     return NextResponse.json({ message: "Güncellendi", client });

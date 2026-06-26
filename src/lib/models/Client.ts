@@ -10,7 +10,7 @@ export interface IClient extends Document {
   startWeight: number;
   chronicDiseases: string[];
   // Yeni alanlar
-  gender?: "male" | "female";
+  gender?: "male" | "female" | "other";
   activityLevel?: "sedentary" | "light" | "moderate" | "active" | "very_active";
   targetCalories?: number;
   targetProtein?: number;
@@ -43,7 +43,7 @@ const ClientSchema = new Schema<IClient>(
     startWeight: { type: Number, required: true },
     chronicDiseases: [{ type: String }],
     // Yeni alanlar
-    gender: { type: String, enum: ["male", "female"] },
+    gender: { type: String, enum: ["male", "female", "other"] },
     activityLevel: {
       type: String,
       enum: ["sedentary", "light", "moderate", "active", "very_active"],

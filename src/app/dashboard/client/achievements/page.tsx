@@ -82,15 +82,16 @@ export default function AchievementsPage() {
     };
 
     achievements.forEach((achievement) => {
-      if (achievement.id.includes("STREAK")) {
+      const id = achievement.id.toUpperCase();
+      if (id.includes("STREAK")) {
         categories.streak.push(achievement);
-      } else if (achievement.id.includes("WEIGHT")) {
+      } else if (id.includes("WEIGHT")) {
         categories.weight.push(achievement);
-      } else if (achievement.id.includes("MEAL")) {
+      } else if (id.includes("MEAL")) {
         categories.meal.push(achievement);
-      } else if (achievement.id.includes("WATER")) {
+      } else if (id.includes("WATER")) {
         categories.water.push(achievement);
-      } else if (achievement.id.includes("EXERCISE")) {
+      } else if (id.includes("EXERCISE")) {
         categories.exercise.push(achievement);
       } else {
         categories.other.push(achievement);

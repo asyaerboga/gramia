@@ -10,17 +10,17 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "client") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
     }
 
     await dbConnect();
 
-    const client = await Client.findById(session.user.id).select("chronicDiseases");
+    const client = await Client.findOne({ userId: session.user.id }).select("chronicDiseases");
     if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Danışan bulunamadı" }, { status: 404 });
     }
 
-    const bloodTests = await BloodTest.find({ clientId: session.user.id })
+    const bloodTests = await BloodTest.find({ clientId: client._id })
       .sort({ testDate: -1 })
       .select("imageUrl originalName notes testDate createdAt");
 
@@ -30,6 +30,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Client health GET error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
   }
 }

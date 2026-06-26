@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "dietitian") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
     }
 
     await dbConnect();
@@ -18,14 +18,14 @@ export async function GET() {
     );
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 404 });
     }
 
     return NextResponse.json(user);
   } catch (error) {
     console.error("Failed to fetch dietitian profile:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Sunucu hatası" },
       { status: 500 },
     );
   }
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "dietitian") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -48,6 +48,8 @@ export async function PATCH(req: NextRequest) {
         updateData[field] = body[field];
       }
     }
+    // Boş string gönderilen gender alanı Mongoose enum validasyonunu kırar, bu yüzden seçilmemiş kabul edilir
+    if (updateData.gender === "") delete updateData.gender;
 
     const user = await User.findByIdAndUpdate(
       session.user.id,
@@ -56,14 +58,14 @@ export async function PATCH(req: NextRequest) {
     ).select("name email phone gender");
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Profile updated successfully", user });
+    return NextResponse.json({ message: "Profil başarıyla güncellendi", user });
   } catch (error) {
     console.error("Failed to update dietitian profile:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Sunucu hatası" },
       { status: 500 },
     );
   }

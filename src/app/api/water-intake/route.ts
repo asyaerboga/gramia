@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import WaterIntake from "@/lib/models/WaterIntake";
 import Client from "@/lib/models/Client";
+import { checkAndAwardAchievements } from "@/lib/achievementService";
 
 // POST /api/water-intake - Add water intake
 export async function POST(request: Request) {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
     }
 
-    const { amount } = await request.json();
+    const { amount, date } = await request.json();
 
     if (!amount || amount <= 0) {
       return NextResponse.json(
@@ -32,10 +33,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? new Date(date + "T00:00:00.000Z")
+      : (() => { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d; })();
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     // Update existing or create new
     const existing = await WaterIntake.findOne({
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     if (existing) {
       existing.amount += amount;
       await existing.save();
+      await checkAndAwardAchievements(client._id.toString()).catch(console.error);
       return NextResponse.json(existing);
     }
 
@@ -54,6 +57,8 @@ export async function POST(request: Request) {
       date: today,
       amount,
     });
+
+    await checkAndAwardAchievements(client._id.toString()).catch(console.error);
 
     return NextResponse.json(waterIntake, { status: 201 });
   } catch (error) {

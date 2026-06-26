@@ -16,7 +16,7 @@ import User from "@/lib/models/User";
 export const dynamic = "force-dynamic";
 
 // GET /api/client/daily-summary - Get daily summary for the client
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "client") {
@@ -53,11 +53,22 @@ export async function GET() {
       });
     }
 
-    // Today's date range (local time)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Use the client's local date when provided to avoid UTC vs local timezone mismatch
+    const { searchParams } = new URL(request.url);
+    const dateParam = searchParams.get("date"); // "YYYY-MM-DD" from client's local date
+
+    let today: Date;
+    let tomorrow: Date;
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      today = new Date(dateParam + "T00:00:00.000Z");
+      tomorrow = new Date(dateParam + "T00:00:00.000Z");
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    } else {
+      today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      tomorrow = new Date(today);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    }
 
     // Each query runs independently so a single failure doesn't block the rest
     const [meals, waterRecord, todayExercises, todaySleep, todayCheckIn, recentAchievements, appointments, latestMeasurement] =

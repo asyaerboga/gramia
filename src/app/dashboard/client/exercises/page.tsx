@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
   FaClock, FaPlus, FaTrash,
-  FaSearch, FaEdit, FaTimes,
+  FaSearch, FaEdit, FaTimes, FaCheck,
 } from "react-icons/fa";
 
 /* ── Types ──────────────────────────────────────────────── */
@@ -33,11 +33,17 @@ interface DayProgram {
   exercises: ProgramExercise[];
 }
 
+interface ExerciseCompletion {
+  date: string;
+  name: string;
+}
+
 interface ExerciseProgram {
   _id: string;
   name: string;
   days: DayProgram[];
   completions: string[];
+  exerciseCompletions: ExerciseCompletion[];
 }
 
 type ExerciseCategory = "cardio" | "strength" | "flexibility" | "other";
@@ -188,6 +194,7 @@ export default function ExercisesPage() {
   const [programLoading, setProgramLoading] = useState(true);
   const [selectedDayIdx, setSelectedDayIdx] = useState(todayDayIdx);
   const [loggingDay, setLoggingDay] = useState(false);
+  const [togglingExercise, setTogglingExercise] = useState<string | null>(null);
 
   /* Program edit modal */
   const [showProgramModal, setShowProgramModal] = useState(false);
@@ -267,6 +274,29 @@ export default function ExercisesPage() {
       }
     } catch (err) { console.error(err); error("Hata", "Bir hata oluştu."); }
     finally { setLoggingDay(false); }
+  };
+
+  /* ── Tek bir egzersizi tikle/tikten çıkar ───────── */
+  const handleToggleExercise = async (exerciseName: string) => {
+    const { dayOfWeek, dateStr } = weekDates[selectedDayIdx];
+    setTogglingExercise(exerciseName);
+    try {
+      const res = await fetch("/api/exercise-programs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr, dayOfWeek, exerciseName }),
+      });
+      if (res.ok) {
+        const updated: ExerciseProgram = await res.json();
+        setProgram(updated);
+        fetchExercises();
+        router.refresh();
+      } else {
+        const data = await res.json();
+        error("Hata", data.error ?? "İşlem başarısız.");
+      }
+    } catch (err) { console.error(err); error("Hata", "Bir hata oluştu."); }
+    finally { setTogglingExercise(null); }
   };
 
   /* ── Program düzenleme ──────────────────────────── */
@@ -415,6 +445,9 @@ export default function ExercisesPage() {
   const selectedDayProgram = program?.days.find((d) => d.dayOfWeek === selectedDayDow);
   const selectedDateStr = weekDates[selectedDayIdx].dateStr;
   const isDayCompleted = program?.completions.includes(selectedDateStr) ?? false;
+  const isSelectedToday = weekDates[selectedDayIdx].isToday;
+  const isExerciseCompleted = (name: string) =>
+    program?.exerciseCompletions?.some((c) => c.date === selectedDateStr && c.name === name) ?? false;
 
   const modalDayDow = WEEK_DAYS[modalDayIdx].dayOfWeek;
   const modalDayExercises = editDays.find((d) => d.dayOfWeek === modalDayDow)?.exercises ?? [];
@@ -605,13 +638,15 @@ export default function ExercisesPage() {
                 ) : exercises.length > 0 ? (
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-gray-400">{exercises.length} egzersiz kaydedildi · Haftalık programda yok</p>
-                    <button
-                      onClick={() => handleCompleteDay(true)}
-                      disabled={loggingDay}
-                      className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-emerald-400 to-green-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-100 transition-all text-sm disabled:opacity-60"
-                    >
-                      {loggingDay ? "⏳" : "✅"} Tamamladım
-                    </button>
+                    {isSelectedToday && (
+                      <button
+                        onClick={() => handleCompleteDay(true)}
+                        disabled={loggingDay}
+                        className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-emerald-400 to-green-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-100 transition-all text-sm disabled:opacity-60"
+                      >
+                        {loggingDay ? "⏳" : "✅"} Tamamladım
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4 text-gray-400 text-sm bg-gray-50 rounded-2xl">
@@ -623,16 +658,26 @@ export default function ExercisesPage() {
                   <div className="space-y-2 mb-4">
                     {selectedDayProgram.exercises.map((ex, i) => {
                       const cfg = categoryConfig[ex.type];
+                      const done = isExerciseCompleted(ex.name);
+                      const isToggling = togglingExercise === ex.name;
                       return (
-                        <div key={i} className={`flex items-center gap-3 p-3 ${isDayCompleted ? "bg-emerald-50" : cfg.bg} rounded-2xl border-l-4 ${isDayCompleted ? "border-l-emerald-400" : cfg.borderLeft} transition-all`}>
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isDayCompleted ? "bg-emerald-100" : cfg.iconBg} text-base`}>
-                            {cfg.emoji}
-                          </div>
+                        <div key={i} className={`flex items-center gap-3 p-3 ${done ? "bg-emerald-50" : cfg.bg} rounded-2xl border-l-4 ${done ? "border-l-emerald-400" : cfg.borderLeft} transition-all`}>
+                          <button
+                            type="button"
+                            onClick={() => isSelectedToday && !isToggling && handleToggleExercise(ex.name)}
+                            disabled={!isSelectedToday || isToggling}
+                            title={isSelectedToday ? (done ? "Tamamlanmadı olarak işaretle" : "Tamamlandı olarak işaretle") : undefined}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base transition-all ${
+                              done ? "bg-emerald-500 text-white" : `${cfg.iconBg} ${isSelectedToday ? "hover:scale-110 cursor-pointer" : "cursor-default"}`
+                            }`}
+                          >
+                            {isToggling ? "⏳" : done ? <FaCheck className="text-sm" /> : cfg.emoji}
+                          </button>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{ex.name}</p>
+                            <p className={`text-sm font-semibold truncate ${done ? "text-emerald-700" : "text-gray-800"}`}>{ex.name}</p>
                             <p className="text-xs text-gray-400">{ex.duration} dk · {ex.caloriesBurned ?? 0} kcal</p>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${isDayCompleted ? "bg-emerald-100 text-emerald-700" : cfg.pill}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${done ? "bg-emerald-100 text-emerald-700" : cfg.pill}`}>
                             {exerciseTypeLabels[ex.type]}
                           </span>
                         </div>
@@ -642,20 +687,24 @@ export default function ExercisesPage() {
 
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-gray-400 font-medium">
-                      {selectedDayProgram.exercises.length} egzersiz ·{" "}
+                      {selectedDayProgram.exercises.filter((ex) => isExerciseCompleted(ex.name)).length}/{selectedDayProgram.exercises.length} egzersiz tamamlandı ·{" "}
                       {selectedDayProgram.exercises.reduce((a, e) => a + e.duration, 0)} dk ·{" "}
                       {selectedDayProgram.exercises.reduce((a, e) => a + (e.caloriesBurned ?? 0), 0)} kcal
                     </p>
-                    {!isDayCompleted ? (
+                    {isDayCompleted ? (
+                      <span className="text-xs text-gray-400">Egzersizler kaydedildi</span>
+                    ) : isSelectedToday ? (
                       <button
                         onClick={() => handleCompleteDay()}
                         disabled={loggingDay}
                         className="flex items-center gap-2 px-5 py-2 bg-linear-to-r from-emerald-400 to-green-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-100 transition-all text-sm disabled:opacity-60 hover:-translate-y-0.5 active:translate-y-0"
                       >
-                        {loggingDay ? "⏳" : "✅"} Programımı Yaptım!
+                        {loggingDay ? "⏳" : "✅"} Tümünü Tamamla
                       </button>
                     ) : (
-                      <span className="text-xs text-gray-400">Egzersizler kaydedildi</span>
+                      <span className="text-xs text-gray-400">
+                        {weekDates[selectedDayIdx].dateStr < getLocalDateStr() ? "Bu gün için işaretleme süresi geçti" : "Henüz gelmedi"}
+                      </span>
                     )}
                   </div>
                 </>
